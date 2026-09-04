@@ -1,14 +1,29 @@
 import streamlit as st
 from supabase import create_client, Client
 
-# Supabase Bağlantısı
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
+# Yerleşik Tenis Sözlüğü (Türkçe <-> İngilizce Kural Terimleri Eşlemesi)
+TENNIS_SOZLugu = {
+    "top": ["ball", "balls"],
+    "top değişimi": ["ball change", "change of balls"],
+    "mola": ["break", "rest", "toilet break", "medical time-out", "mto", "rest period"],
+    "servis": ["serve", "service", "let", "fault"],
+    "itiraz": ["appeal", "challenge", "review", "hawk-eye"],
+    "uzatma": ["tie-break", "tiebreak"],
+    "hakem": ["umpire", "referee", "supervisor", "chair umpire"],
+    "diskalifiye": ["default", "disqualification", "code violation"],
+    "kod ihlali": ["code violation", "penalty", "warnings"],
+    "hava": ["weather", "suspension", "interruption", "heat rule", "bad weather"],
+    "tuvalet": ["toilet break", "restroom"],
+    "sağlık": ["medical", "injury", "treatment"]
+}
+
 def hakem_panelini_ciz():
     st.title("🎾 Başhakem Dijital Asistanı")
-    st.markdown("Sahada hızlı karar için talimatlarda kelime bazlı arama yapın.")
+    st.markdown("Talimatlarda Türkçe veya İngilizce terimlerle kelime bazlı arama yapın.")
     st.markdown("---")
 
     if 'aktif_kategori' not in st.session_state:
@@ -56,42 +71,62 @@ def hakem_panelini_ciz():
     else:
         st.success(f"📍 **Aktif Kategori / Arama Alanı:** {st.session_state.aktif_kategori}")
 
-        # Sohbet / Arama Kutusu (Sonuçlar doğrudan buraya gelecek)
-        aranan_kelime = st.chat_input("Örn: top değişimi, mola, hakem kararı...")
+        aranan_kelime = st.chat_input("Örn: mola, top değişimi, toilet break...")
         
         if aranan_kelime:
             with st.chat_message("user"):
                 st.write(aranan_kelime)
                 
             with st.chat_message("assistant"):
-                with st.spinner("Supabase veritabanında taranıyor..."):
+                with st.spinner("Veritabanı ve yerleşik sözlük taranıyor..."):
                     try:
-                        # Supabase Sorgusu (Esnek ve Büyük/Küçük Harf Duyarsız - ILIKE)
-                        sorgu = supabase.table("kural_icerikleri").select("dosya_adi, kategori, dosya_url, icerik")
+                        # 1. Yerleşik sözlük kontrolü (Türkçe kelimenin İngilizce karşılıklarını bul)
+                        aranan_lower = aranan_kelime.lower().strip()
+                        aranacak_terimler = [aranan_lower]
                         
-                        # Eğer "Tüm Talimatlar" seçilmediyse kategoriye göre filtrele
+                        for tr_key, en_list in TENNIS_SOZLugu.items():
+                            if tr_key in aranan_lower:
+                                aranacak_terimler.extend(en_list)
+                        
+                        # 2. Supabase Sorgu Hazırlığı (Çoklu kelime / sözlük desteği)
+                        sorgu = supabase.table("kural_icerikleri").select("dosya_adi, kategori, sayfa_no, dosya_url, icerik")
+                        
                         if st.session_state.aktif_kategori != "Tüm Talimatlar":
                             sorgu = sorgu.eq("kategori", st.session_state.aktif_kategori)
                         
-                        # Kelimeyi esnek aratmak için % ekliyoruz
-                        sonuclar = sorgu.ilike("icerik", f"%{aranan_kelime}%").execute().data
+                        # Sözlükten gelen tüm terimleri (Türkçe ve İngilizce) OR ile bağlıyoruz
+                        filtre_parcalari = []
+                        for terim in aranacak_terimler:
+                            filtre_parcalari.append(f"icerik.ilike.%{terim}%")
+                        
+                        sorgu = sorgu.or_(",".join(filtre_parcalari))
+                        sonuclar = sorgu.execute().data
                         
                         if sonuclar:
-                            st.success(f"Bulunan ilgili belge sayısı: {len(sonuclar)}")
+                            st.success(f"Bulunan ilgili sayfa sayısı: {len(sonuclar)}")
+                            
+                            # Her bir sonuç için sayfa ve bağlam detayını basalım
                             for kayit in sonuclar:
-                                st.markdown(f"📄 **Belge:** {kayit['dosya_adi']} *({kayit['kategori']})*")
-                                st.markdown(f"🔗 [Orijinal PDF Dosyasını Aç]({kayit['dosya_url']})")
+                                sayfa_bilgi = f" | 📌 Sayfa: {kayit.get('sayfa_no', 'Bilinmiyor')}" if kayit.get('sayfa_no') else ""
+                                st.markdown(f"📄 **Belge:** {kayit['dosya_adi']} *({kayit['kategori']}){sayfa_bilgi}*")
+                                st.markdown(f"🔗 [İlgili Sayfayı / PDF'i Aç]({kayit['dosya_url']})")
                                 
-                                # Metin içinden aranan kelimenin geçtiği kısmı kesip önizleme verelim
+                                # Bağlam (Metin kesiti)
                                 metin = kayit['icerik']
-                                idx = metin.lower().find(aranan_kelime.lower())
+                                bul_terim = aranan_lower if aranan_lower in metin.lower() else aranacak_terimler[0]
+                                idx = metin.lower().find(bul_terim)
+                                
                                 if idx != -1:
-                                    baslangic = max(0, idx - 100)
-                                    bitis = min(len(metin), idx + 300)
-                                    kesit = metin[baslangic:bitis]
-                                    st.info(f"💡 **İlgili Kesit:**\n\n...{kesit}...")
+                                    baslangic = max(0, idx - 120)
+                                    bitis = min(len(metin), idx + 350)
+                                    kesit = metin[baslangic:bitis].replace("\n", " ")
+                                    st.info(f"💡 **İlgili Bağlam:**\n\n...{kesit}...")
+                                else:
+                                    # Alternatif olarak ilk 300 karakteri verelim
+                                    st.info(f"💡 **İlgili Bağlam:**\n\n...{metin[:300]}...")
+                                    
                                 st.markdown("---")
                         else:
-                            st.warning(f"'{aranan_kelime}' kelimesi seçilen kategorideki belgelerde bulunamadı.")
+                            st.warning(f"'{aranan_kelime}' (veya sözlük karşılıkları) seçilen kategoride bulunamadı.")
                     except Exception as e:
                         st.error(f"Arama sırasında hata oluştu: {e}")
