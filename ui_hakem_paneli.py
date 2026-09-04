@@ -107,9 +107,16 @@ def hakem_panelini_ciz():
                                 for kayit in sonuclar:
                                     sayfa_bilgi = f" | 📌 Sayfa: {kayit.get('sayfa_no', 'Bilinmiyor')}" if kayit.get('sayfa_no') else ""
                                     st.markdown(f"📄 **Belge:** {kayit['dosya_adi']} *({kayit['kategori']}){sayfa_bilgi}*")
-                                    st.markdown(f"🔗 [Orijinal PDF'i Aç / İndir]({kayit['dosya_url']})")
                                     
-                                    # Bağlam ve Aranan Kelimeyi Vurgulama (Highlight)
+                                    # PDF açma sorunu için güvenli link butonu
+                                    pdf_url = kayit['dosya_url']
+                                    if isinstance(pdf_url, dict):
+                                        pdf_url = pdf_url.get('publicUrl', '')
+                                    
+                                    if pdf_url:
+                                        st.link_button("📄 Orijinal PDF'i Aç / İndir", pdf_url)
+                                    
+                                    # Bağlam ve Parlak Uranyum Yeşili Vurgulama
                                     metin = kayit['icerik']
                                     bul_terim = aranan_lower if aranan_lower in metin.lower() else aranacak_terimler[0]
                                     idx = metin.lower().find(bul_terim)
@@ -119,13 +126,16 @@ def hakem_panelini_ciz():
                                         bitis = min(len(metin), idx + 350)
                                         kesit = metin[baslangic:bitis].replace("\n", " ")
                                         
-                                        # Metin içinde aranan kelimeyi otomatik **kalın** yapıyoruz ki gözden kaçmasın
+                                        # Parlak Uranyum Yeşili Vurgu (#39ff14) - Emoji yok
                                         pattern = re.compile(re.escape(bul_terim), re.IGNORECASE)
-                                        vurgulu_kesit = pattern.sub(lambda m: f"**🔍 {m.group(0)} 🔍**", kesit)
+                                        vurgulu_kesit = pattern.sub(
+                                            lambda m: f'<span style="background-color: #39ff14; color: #000000; font-weight: bold; padding: 2px 4px; border-radius: 3px;">{m.group(0)}</span>', 
+                                            kesit
+                                        )
                                         
-                                        st.info(f"💡 **İlgili Bağlam:**\n\n...{vurgulu_kesit}...")
+                                        st.markdown(f"💡 **İlgili Bağlam:**<br>...{vurgulu_kesit}...", unsafe_allow_html=True)
                                     else:
-                                        st.info(f"💡 **İlgili Bağlam:**\n\n...{metin[:300]}...")
+                                        st.markdown(f"💡 **İlgili Bağlam:**<br>...{metin[:300]}...", unsafe_allow_html=True)
                                         
                                     st.markdown("---")
                             else:
@@ -137,7 +147,7 @@ def hakem_panelini_ciz():
         st.subheader("📚 Kayıtlı Belgeler Kütüphanesi")
         st.markdown("Sistemdeki tüm kural kitapçıklarını filtreleyebilir, inceleyebilir veya indirebilirsiniz.")
         
-        # Filtreleme ve Sıralama Seçenekleri (Hakem Paneli için salt okunur)
+        # Sıralama ve Filtreleme Modu
         siralama_turu = st.radio(
             "Sıralama ve Filtreleme Modu:", 
             ["🔤 Alfabetik Sıralama (Tümü)", "📂 Kategoriye Göre Sıralama"],
@@ -160,27 +170,37 @@ def hakem_panelini_ciz():
                         with col2:
                             st.caption(f"📂 {row['kategori']}")
                         with col3:
-                            st.markdown(f"[🔗 Aç / İndir]({row['dosya_url']})")
+                            doc_url = row['dosya_url']
+                            if isinstance(doc_url, dict):
+                                doc_url = doc_url.get('publicUrl', '')
+                            if doc_url:
+                                st.link_button("📄 Aç / İndir", doc_url)
                         st.markdown("---")
                         
                 else: # Kategoriye Göre Sıralama
-                    secilen_grup_kategori = st.selectbox(
-                        "Görüntülenecek Kategoriyi Seçin:", 
-                        df_unique["kategori"].unique().tolist()
-                    )
-                    
-                    df_filtered = df_unique[df_unique["kategori"] == secilen_grup_kategori].sort_values(by="dosya_adi")
-                    st.markdown("---")
-                    if not df_filtered.empty:
-                        for idx, row in df_filtered.iterrows():
-                            col1, col2 = st.columns([4, 1])
-                            with col1:
-                                st.markdown(f"**{row['dosya_adi']}**")
-                            with col2:
-                                st.markdown(f"[🔗 Aç / İndir]({row['dosya_url']})")
-                            st.markdown("---")
-                    else:
-                        st.info("Bu kategoride kayıtlı belge bulunmuyor.")
+                    kategoriler_listesi = df_unique["kategori"].unique().tolist()
+                    if kategoriler_listesi:
+                        secilen_grup_kategori = st.selectbox(
+                            "Görüntülenecek Kategoriyi Seçin:", 
+                            kategoriler_listesi
+                        )
+                        
+                        df_filtered = df_unique[df_unique["kategori"] == secilen_grup_kategori].sort_values(by="dosya_adi")
+                        st.markdown("---")
+                        if not df_filtered.empty:
+                            for idx, row in df_filtered.iterrows():
+                                col1, col2 = st.columns([4, 1])
+                                with col1:
+                                    st.markdown(f"**{row['dosya_adi']}**")
+                                with col2:
+                                    doc_url = row['dosya_url']
+                                    if isinstance(doc_url, dict):
+                                        doc_url = doc_url.get('publicUrl', '')
+                                    if doc_url:
+                                        st.link_button("📄 Aç / İndir", doc_url)
+                                st.markdown("---")
+                        else:
+                            st.info("Bu kategoride kayıtlı belge bulunmuyor.")
             else:
                 st.warning("Veritabanında henüz kayıtlı belge bulunmuyor.")
         except Exception as e:
