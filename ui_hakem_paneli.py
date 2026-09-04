@@ -27,7 +27,6 @@ def hakem_panelini_ciz():
     st.markdown("Talimatlarda arama yapın veya kütüphane indeksini inceleyin.")
     st.markdown("---")
 
-    # Üst Sekmeler (Arama Ekranı ile Belge İndeksi Arasında Geçiş)
     sekme_arama, sekme_indeks = st.tabs(["🔍 Kural Arama", "📚 Belge İndeksi & Kütüphane"])
 
     with sekme_arama:
@@ -108,15 +107,14 @@ def hakem_panelini_ciz():
                                     sayfa_bilgi = f" | 📌 Sayfa: {kayit.get('sayfa_no', 'Bilinmiyor')}" if kayit.get('sayfa_no') else ""
                                     st.markdown(f"📄 **Belge:** {kayit['dosya_adi']} *({kayit['kategori']}){sayfa_bilgi}*")
                                     
-                                    # PDF açma sorunu için güvenli link butonu
+                                    # Güvenli URL Çıkarımı (Çökme Önleyici)
                                     pdf_url = kayit['dosya_url']
                                     if isinstance(pdf_url, dict):
                                         pdf_url = pdf_url.get('publicUrl', '')
                                     
                                     if pdf_url:
-                                        st.link_button("📄 Orijinal PDF'i Aç / İndir", pdf_url)
+                                        st.markdown(f"🔗 [Orijinal PDF'i Aç / İndir]({pdf_url})")
                                     
-                                    # Bağlam ve Parlak Uranyum Yeşili Vurgulama
                                     metin = kayit['icerik']
                                     bul_terim = aranan_lower if aranan_lower in metin.lower() else aranacak_terimler[0]
                                     idx = metin.lower().find(bul_terim)
@@ -126,7 +124,6 @@ def hakem_panelini_ciz():
                                         bitis = min(len(metin), idx + 350)
                                         kesit = metin[baslangic:bitis].replace("\n", " ")
                                         
-                                        # Parlak Uranyum Yeşili Vurgu (#39ff14) - Emoji yok
                                         pattern = re.compile(re.escape(bul_terim), re.IGNORECASE)
                                         vurgulu_kesit = pattern.sub(
                                             lambda m: f'<span style="background-color: #39ff14; color: #000000; font-weight: bold; padding: 2px 4px; border-radius: 3px;">{m.group(0)}</span>', 
@@ -147,7 +144,6 @@ def hakem_panelini_ciz():
         st.subheader("📚 Kayıtlı Belgeler Kütüphanesi")
         st.markdown("Sistemdeki tüm kural kitapçıklarını filtreleyebilir, inceleyebilir veya indirebilirsiniz.")
         
-        # Sıralama ve Filtreleme Modu
         siralama_turu = st.radio(
             "Sıralama ve Filtreleme Modu:", 
             ["🔤 Alfabetik Sıralama (Tümü)", "📂 Kategoriye Göre Sıralama"],
@@ -174,10 +170,10 @@ def hakem_panelini_ciz():
                             if isinstance(doc_url, dict):
                                 doc_url = doc_url.get('publicUrl', '')
                             if doc_url:
-                                st.link_button("📄 Aç / İndir", doc_url)
+                                st.markdown(f"🔗 [Aç / İndir]({doc_url})")
                         st.markdown("---")
                         
-                else: # Kategoriye Göre Sıralama
+                else:
                     kategoriler_listesi = df_unique["kategori"].unique().tolist()
                     if kategoriler_listesi:
                         secilen_grup_kategori = st.selectbox(
@@ -197,7 +193,7 @@ def hakem_panelini_ciz():
                                     if isinstance(doc_url, dict):
                                         doc_url = doc_url.get('publicUrl', '')
                                     if doc_url:
-                                        st.link_button("📄 Aç / İndir", doc_url)
+                                        st.markdown(f"🔗 [Aç / İndir]({doc_url})")
                                 st.markdown("---")
                         else:
                             st.info("Bu kategoride kayıtlı belge bulunmuyor.")
