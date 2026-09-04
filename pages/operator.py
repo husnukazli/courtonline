@@ -40,12 +40,12 @@ else:
             dosya_adi = yuklenen_dosya.name
             
             try:
-                # 1. Supabase Storage'a Yükleme (Bucket adı: 'belgeler')
+                # 1. Supabase Storage'a Yükleme (Bucket adı: 'Belgeler')
                 dosya_verisi = yuklenen_dosya.read()
-                res = supabase.storage.from_("belgeler").upload(dosya_adi, dosya_verisi)
+                res = supabase.storage.from_("Belgeler").upload(dosya_adi, dosya_verisi)
                 
                 # 2. Public URL'i Alma
-                dosya_url = supabase.storage.from_("belgeler").get_public_url(dosya_adi)
+                dosya_url = supabase.storage.from_("Belgeler").get_public_url(dosya_adi)
                 
                 # 3. Veritabanı Tablosuna (kural_dosyalari) Kaydetme
                 supabase.table("kural_dosyalari").insert({
