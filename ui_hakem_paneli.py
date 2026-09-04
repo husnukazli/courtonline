@@ -11,24 +11,32 @@ def hakem_panelini_ciz():
 
     st.subheader("Kategori Seçin")
     
-    # Kalıcı Aksiyon Butonları (Selectbox YOK)
+    # Kalıcı Aksiyon Butonları (Açılır menü kullanılmamıştır)
     col1, col2, col3 = st.columns(3)
     
     with col1:
         if st.button("🏆 ITF Kuralları", use_container_width=True):
             st.session_state.aktif_kategori = "ITF Kuralları"
-        if st.button("♿ Tekerlekli Sandalye", use_container_width=True):
-            st.session_state.aktif_kategori = "Tekerlekli Sandalye"
+        if st.button("🌍 ATP", use_container_width=True):
+            st.session_state.aktif_kategori = "ATP"
+        if st.button("👑 WTA", use_container_width=True):
+            st.session_state.aktif_kategori = "WTA"
+        if st.button("🏟️ Grand Slam", use_container_width=True):
+            st.session_state.aktif_kategori = "Grand Slam"
             
     with col2:
         if st.button("🇪🇺 Tennis Europe", use_container_width=True):
             st.session_state.aktif_kategori = "Tennis Europe"
-        if st.button("🏖️ Beach Tennis", use_container_width=True):
-            st.session_state.aktif_kategori = "Beach Tennis"
-            
-    with col3:
         if st.button("🇹🇷 TTF Ulusal", use_container_width=True):
             st.session_state.aktif_kategori = "TTF Ulusal"
+        if st.button("🏅 Masters", use_container_width=True):
+            st.session_state.aktif_kategori = "Masters"
+            
+    with col3:
+        if st.button("♿ Tekerlekli Sandalye", use_container_width=True):
+            st.session_state.aktif_kategori = "Tekerlekli Sandalye"
+        if st.button("🏖️ Beach Tennis", use_container_width=True):
+            st.session_state.aktif_kategori = "Beach Tennis"
         if st.button("📌 Sık Sorulanlar", use_container_width=True):
             st.session_state.aktif_kategori = "Sık Sorulanlar"
 
@@ -54,7 +62,7 @@ def hakem_panelini_ciz():
             with st.chat_message("user"):
                 st.write(mesaj)
                 
-            # Gemini API'den gelecek cevabın yer tutucusu
+            # Yapay Zeka cevap alanı (Şimdilik yer tutucu)
             with st.chat_message("assistant"):
-                st.write(f"*{st.session_state.aktif_kategori} talimatnamesi taranıyor...*")
-                st.info("Buraya Gemini 1.5 Flash'tan dönen sayfa referanslı cevap gelecek.")
+                st.write(f"*{st.session_state.aktif_kategori} veritabanı taranıyor...*")
+                st.info("Buraya Supabase'den çekilen belgelere göre Gemini 1.5 Flash'tan dönen cevap gelecek.")
