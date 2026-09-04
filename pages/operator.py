@@ -3,15 +3,13 @@ import pdfplumber
 import io
 from supabase import create_client, Client
 
-# Supabase Bağlantısı
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
 st.title("🔐 Yönetim Paneli")
-st.markdown("PDF kural kitapçıklarını yükleyin; metinler otomatik olarak taranıp veritabanına işlenecektir.")
+st.markdown("PDF kural kitapçıklarını sayfa sayfa tarayıp veritabanına işleyin.")
 
-# Şifre Kontrolü
 if 'admin_giris' not in st.session_state:
     st.session_state.admin_giris = False
 
@@ -35,9 +33,9 @@ else:
     
     yuklenen_dosyalar = st.file_uploader("PDF Belgeleri Seçin", type=["pdf"], accept_multiple_files=True)
     
-    if st.button("📤 Belgeleri Yükle ve Metinleri İşle", type="primary"):
+    if st.button("📤 Belgeleri Yükle ve Sayfa Sayfa İşle", type="primary"):
         if yuklenen_dosyalar:
-            basarili = 0
+            toplam_sayfa_kaydi = 0
             
             for dosya in yuklenen_dosyalar:
                 dosya_adi = dosya.name
@@ -48,27 +46,29 @@ else:
                     supabase.storage.from_("Belgeler").upload(dosya_adi, dosya_verisi, file_options={"upsert": "true"})
                     dosya_url = supabase.storage.from_("Belgeler").get_public_url(dosya_adi)
                     
-                    # 2. pdfplumber ile PDF içindeki TÜM metinleri ayıkla
-                    tum_metin = ""
+                    # 2. pdfplumber ile Sayfa Sayfa Metin Ayıklama
                     with pdfplumber.open(io.BytesIO(dosya_verisi)) as pdf:
-                        for sayfa in pdf.pages:
+                        for sayfa_index, sayfa in enumerate(pdf.pages):
                             metin = sayfa.extract_text()
-                            if metin:
-                                tum_metin += metin + "\n"
-                    
-                    # 3. Veritabanına (kural_icerikleri) kaydet
-                    supabase.table("kural_icerikleri").insert({
-                        "dosya_adi": dosya_adi,
-                        "kategori": secilen_kategori,
-                        "icerik": tum_metin,
-                        "dosya_url": dosya_url
-                    }).execute()
-                    
-                    basarili += 1
+                            if metin and metin.strip():
+                                sayfa_no = sayfa_index + 1
+                                
+                                # Her sayfayı satır olarak veritabanına kaydediyoruz
+                                supabase.table("kural_icerikleri").insert({
+                                    "dosya_adi": dosya_adi,
+                                    "kategori": secilen_kategori,
+                                    "sayfa_no": sayfa_no,
+                                    "icerik": metin,
+                                    "dosya_url": dosya_url
+                                }).execute()
+                                
+                                toplam_sayfa_kaydi += 1
+                                
+                    st.success(f"✅ '{dosya_adi}' başarıyla işlendi (Toplam {len(pdf.pages)} sayfa).")
                 except Exception as e:
                     st.warning(f"'{dosya_adi}' işlenirken hata oluştu: {e}")
             
-            if basarili > 0:
-                st.success(f"✅ Toplam {basarili} belge başarıyla işlendi ve veritabanına kaydedildi!")
+            if toplam_sayfa_kaydi > 0:
+                st.success(f"🎉 İşlem tamamlandı! Toplam {toplam_sayfa_kaydi} sayfalık veri tabanı kaydı oluşturuldu.")
         else:
             st.warning("Lütfen en az bir PDF seçin.")
