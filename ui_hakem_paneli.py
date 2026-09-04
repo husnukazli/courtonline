@@ -56,7 +56,7 @@ def hakem_panelini_ciz():
     else:
         st.success(f"📍 **Aktif Kategori / Arama Alanı:** {st.session_state.aktif_kategori}")
 
-        # Arama Kutusu
+        # Sohbet / Arama Kutusu (Sonuçlar doğrudan buraya gelecek)
         aranan_kelime = st.chat_input("Örn: top değişimi, mola, hakem kararı...")
         
         if aranan_kelime:
@@ -64,7 +64,7 @@ def hakem_panelini_ciz():
                 st.write(aranan_kelime)
                 
             with st.chat_message("assistant"):
-                with st.spinner("Supabase veri tabanında taranıyor..."):
+                with st.spinner("Supabase veritabanında taranıyor..."):
                     try:
                         # Supabase Sorgusu (Esnek ve Büyük/Küçük Harf Duyarsız - ILIKE)
                         sorgu = supabase.table("kural_icerikleri").select("dosya_adi, kategori, dosya_url, icerik")
@@ -73,7 +73,7 @@ def hakem_panelini_ciz():
                         if st.session_state.aktif_kategori != "Tüm Talimatlar":
                             sorgu = sorgu.eq("kategori", st.session_state.aktif_kategori)
                         
-                        # Kelimeyi esnek aratmak için her iki başına % ekliyoruz (ILIKE)
+                        # Kelimeyi esnek aratmak için % ekliyoruz
                         sonuclar = sorgu.ilike("icerik", f"%{aranan_kelime}%").execute().data
                         
                         if sonuclar:
@@ -82,14 +82,14 @@ def hakem_panelini_ciz():
                                 st.markdown(f"📄 **Belge:** {kayit['dosya_adi']} *({kayit['kategori']})*")
                                 st.markdown(f"🔗 [Orijinal PDF Dosyasını Aç]({kayit['dosya_url']})")
                                 
-                                # Metin içinden aranan kelimenin geçtiği ilk 300 karakterlik kısmı kesip önizleme verelim
+                                # Metin içinden aranan kelimenin geçtiği kısmı kesip önizleme verelim
                                 metin = kayit['icerik']
                                 idx = metin.lower().find(aranan_kelime.lower())
                                 if idx != -1:
                                     baslangic = max(0, idx - 100)
                                     bitis = min(len(metin), idx + 300)
                                     kesit = metin[baslangic:bitis]
-                                    st.info(f"...{kesit}...")
+                                    st.info(f"💡 **İlgili Kesit:**\n\n...{kesit}...")
                                 st.markdown("---")
                         else:
                             st.warning(f"'{aranan_kelime}' kelimesi seçilen kategorideki belgelerde bulunamadı.")
