@@ -4,7 +4,6 @@ import io
 import pandas as pd
 from supabase import create_client, Client
 
-# Supabase Bağlantısı
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
@@ -12,7 +11,6 @@ supabase: Client = create_client(url, key)
 st.title("🔐 Yönetim Paneli")
 st.markdown("PDF kural kitapçıklarını yükleyin ve mevcut arşivinizi yönetin.")
 
-# Şifre Kontrolü
 if 'admin_giris' not in st.session_state:
     st.session_state.admin_giris = False
 
@@ -28,8 +26,7 @@ else:
     st.success("Giriş başarılı!")
     st.markdown("---")
     
-    # Sekmeler (1. Belge Yükleme | 2. Belge Arşivi ve İndeks)
-    sekme1, sekme2 = st.tabs(["📤 Yeni Belge Yükle", "📚 Alfabetik Belge Arşivi (İndeks)"])
+    sekme1, sekme2 = st.tabs(["📤 Yeni Belge Yükle", "📚 Alfabetik Belge Arşivi"])
     
     with sekme1:
         kategoriler = [
@@ -49,11 +46,12 @@ else:
                     dosya_verisi = dosya.read()
                     
                     try:
-                        # 1. Supabase Storage'a Yükleme
                         supabase.storage.from_("Belgeler").upload(dosya_adi, dosya_verisi, file_options={"upsert": "true"})
-                        dosya_url = supabase.storage.from_("Belgeler").get_public_url(dosya_adi)
                         
-                        # 2. pdfplumber ile Sayfa Sayfa Metin Ayıklama
+                        # Güvenli URL Çekme (Sözlük hatası önlemi)
+                        res_url = supabase.storage.from_("Belgeler").get_public_url(dosya_adi)
+                        dosya_url = res_url.get('publicUrl') if isinstance(res_url, dict) else str(res_url)
+                        
                         with pdfplumber.open(io.BytesIO(dosya_verisi)) as pdf:
                             for sayfa_index, sayfa in enumerate(pdf.pages):
                                 metin = sayfa.extract_text()
@@ -80,21 +78,15 @@ else:
                 st.warning("Lütfen en az bir PDF seçin.")
                 
     with sekme2:
-        st.subheader("📋 Yüklenmiş Belgeler İndeksi")
-        st.markdown("Sistemde kayıtlı tüm PDF'ler alfabetik olarak aşağıda listelenmiştir.")
-        
+        st.subheader("📋 Yüklenmiş Belgeler Arşivi")
         try:
-            # Veritabanından tüm benzersiz dosyaları ve kategorilerini çekelim
             response = supabase.table("kural_icerikleri").select("dosya_adi, kategori, dosya_url").execute()
-            
             if response.data:
                 df = pd.DataFrame(response.data)
-                # Benzersiz dosya adlarını alıp alfabetik sıralayalım
                 df_unique = df.drop_duplicates(subset=["dosya_adi"]).sort_values(by="dosya_adi", ascending=True).reset_index(drop=True)
                 
-                st.info(f"Toplam Yüklenen Benzersiz Belge Sayısı: **{len(df_unique)}**")
+                st.info(f"Toplam Benzersiz Belge Sayısı: **{len(df_unique)}**")
                 
-                # Tablo Görünümü ve İndirme Linkleri
                 for idx, row in df_unique.iterrows():
                     col1, col2, col3 = st.columns([3, 2, 1])
                     with col1:
@@ -102,9 +94,9 @@ else:
                     with col2:
                         st.caption(f"📂 Kategori: {row['kategori']}")
                     with col3:
-                        st.markdown(f"[🔗 İndir / Aç]({row['dosya_url']})")
+                        st.markdown(f"[🔗 Aç / İndir]({row['dosya_url']})")
                     st.markdown("---")
             else:
-                st.warning("Henüz veritabanına yüklenmiş bir belge bulunmuyor.")
+                st.warning("Henüz veritabanında belge yok.")
         except Exception as e:
-            st.error(f"Arşiv yüklenirken bir hata oluştu: {e}")
+            st.error(f"Hata: {e}")
