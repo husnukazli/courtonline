@@ -140,8 +140,8 @@ def hakem_panelini_ciz():
                                     bul_terim = aranan_lower if aranan_lower in metin.lower() else aranacak_terimler[0]
                                     
                                     if pdf_url:
-                                        # URL sonuna sayfa atlama ve arama parametreleri ekleme
-                                        url_kodlu_terim = urllib.parse.quote(bul_terim)
+                                        # URL sonuna sayfa atlama ve arama (TIRNAK İÇİNDE) parametreleri ekleme
+                                        url_kodlu_terim = urllib.parse.quote(f'"{bul_terim}"')
                                         hedefli_url = f"{pdf_url}#page={sayfa_no}&search={url_kodlu_terim}"
                                         
                                         # Streamlit engelini aşan saf HTML butonu
