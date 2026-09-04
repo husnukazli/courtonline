@@ -4,6 +4,7 @@ import re
 import urllib.parse
 from supabase import create_client, Client
 
+# Kapsamlı Tenis Hakemlik ve Kural Sözlüğü (Türkçe <-> İngilizce Resmi Terimler)
 TENNIS_SOZLugu = {
     "top": ["ball", "balls"],
     "top değişimi": ["ball change", "change of balls"],
@@ -131,7 +132,6 @@ def hakem_panelini_ciz():
                                     sayfa_no = kayit.get('sayfa_no', 1)
                                     st.markdown(f"📄 **Belge:** {kayit['dosya_adi']} *({kayit['kategori']}) | 📌 Sayfa: {sayfa_no}*")
                                     
-                                    # PDF URL'ini al
                                     pdf_url = kayit['dosya_url']
                                     if isinstance(pdf_url, dict):
                                         pdf_url = pdf_url.get('publicUrl', '')
@@ -140,11 +140,18 @@ def hakem_panelini_ciz():
                                     bul_terim = aranan_lower if aranan_lower in metin.lower() else aranacak_terimler[0]
                                     
                                     if pdf_url:
-                                        # URL'in sonuna #page=X&search=Y ekleme hilesi
+                                        # URL sonuna sayfa atlama ve arama parametreleri ekleme
                                         url_kodlu_terim = urllib.parse.quote(bul_terim)
                                         hedefli_url = f"{pdf_url}#page={sayfa_no}&search={url_kodlu_terim}"
                                         
-                                        st.markdown(f"🔗 **[Orijinal PDF'i Doğrudan {sayfa_no}. Sayfada Aç ve Kelimeyi Bul]({hedefli_url})**")
+                                        # Streamlit engelini aşan saf HTML butonu
+                                        st.markdown(
+                                            f'''<a href="{hedefli_url}" target="_blank" 
+                                            style="background-color: #2e3034; color: #39ff14; padding: 8px 12px; border-radius: 6px; text-decoration: none; display: inline-block; margin-bottom: 10px; font-weight: bold; border: 1px solid #39ff14;">
+                                            ↗️ {sayfa_no}. Sayfayı Doğrudan Aç ve "{bul_terim}" Kelimesine Git
+                                            </a>''', 
+                                            unsafe_allow_html=True
+                                        )
                                     
                                     idx = metin.lower().find(bul_terim)
                                     
