@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 import re
+import urllib.parse
 from supabase import create_client, Client
 
-# Kapsamlı Tenis Hakemlik ve Kural Sözlüğü (Türkçe <-> İngilizce Resmi Terimler)
 TENNIS_SOZLugu = {
     "top": ["ball", "balls"],
     "top değişimi": ["ball change", "change of balls"],
@@ -128,18 +128,24 @@ def hakem_panelini_ciz():
                                 st.success(f"Bulunan ilgili sayfa sayısı: {len(sonuclar)}")
                                 
                                 for kayit in sonuclar:
-                                    sayfa_bilgi = f" | 📌 Sayfa: {kayit.get('sayfa_no', 'Bilinmiyor')}" if kayit.get('sayfa_no') else ""
-                                    st.markdown(f"📄 **Belge:** {kayit['dosya_adi']} *({kayit['kategori']}){sayfa_bilgi}*")
+                                    sayfa_no = kayit.get('sayfa_no', 1)
+                                    st.markdown(f"📄 **Belge:** {kayit['dosya_adi']} *({kayit['kategori']}) | 📌 Sayfa: {sayfa_no}*")
                                     
+                                    # PDF URL'ini al
                                     pdf_url = kayit['dosya_url']
                                     if isinstance(pdf_url, dict):
                                         pdf_url = pdf_url.get('publicUrl', '')
                                     
-                                    if pdf_url:
-                                        st.markdown(f"🔗 [Orijinal PDF'i Aç / İndir]({pdf_url})")
-                                    
                                     metin = kayit['icerik']
                                     bul_terim = aranan_lower if aranan_lower in metin.lower() else aranacak_terimler[0]
+                                    
+                                    if pdf_url:
+                                        # URL'in sonuna #page=X&search=Y ekleme hilesi
+                                        url_kodlu_terim = urllib.parse.quote(bul_terim)
+                                        hedefli_url = f"{pdf_url}#page={sayfa_no}&search={url_kodlu_terim}"
+                                        
+                                        st.markdown(f"🔗 **[Orijinal PDF'i Doğrudan {sayfa_no}. Sayfada Aç ve Kelimeyi Bul]({hedefli_url})**")
+                                    
                                     idx = metin.lower().find(bul_terim)
                                     
                                     if idx != -1:
