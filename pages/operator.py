@@ -4,9 +4,10 @@ import io
 import pandas as pd
 from supabase import create_client, Client
 
-url = st.secrets["supabase"]["url"]
-key = st.secrets["supabase"]["key"]
-supabase: Client = create_client(url, key)
+def supabase_baglantisi_kur():
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    return create_client(url, key)
 
 st.title("🔐 Yönetim Paneli")
 st.markdown("PDF kural kitapçıklarını yükleyin ve mevcut arşivinizi yönetin.")
@@ -26,11 +27,17 @@ else:
     st.success("Giriş başarılı!")
     st.markdown("---")
     
+    try:
+        supabase = supabase_baglantisi_kur()
+    except Exception as e:
+        st.error("⚠️ Supabase bağlantı ayarları (Secrets) yüklenemedi.")
+        st.stop()
+    
     sekme1, sekme2 = st.tabs(["📤 Yeni Belge Yükle", "📚 Alfabetik Belge Arşivi"])
     
     with sekme1:
         kategoriler = [
-            "ITF Kuralları", "ATP", "WTA", "Grand Slam", "Tennis Europe", 
+            "ITF Kuralları", "ITF Junior", "ATP", "WTA", "Grand Slam", "Tennis Europe", 
             "TTF Ulusal", "Masters", "Tekerlekli Sandalye", "Beach Tennis", "Sık Sorulanlar"
         ]
         secilen_kategori = st.radio("Belgelerin Kategorisini Seçin:", kategoriler, horizontal=True)
@@ -48,7 +55,6 @@ else:
                     try:
                         supabase.storage.from_("Belgeler").upload(dosya_adi, dosya_verisi, file_options={"upsert": "true"})
                         
-                        # Güvenli URL Çekme (Sözlük hatası önlemi)
                         res_url = supabase.storage.from_("Belgeler").get_public_url(dosya_adi)
                         dosya_url = res_url.get('publicUrl') if isinstance(res_url, dict) else str(res_url)
                         
@@ -94,9 +100,13 @@ else:
                     with col2:
                         st.caption(f"📂 Kategori: {row['kategori']}")
                     with col3:
-                        st.markdown(f"[🔗 Aç / İndir]({row['dosya_url']})")
+                        doc_url = row['dosya_url']
+                        if isinstance(doc_url, dict):
+                            doc_url = doc_url.get('publicUrl', '')
+                        if doc_url:
+                            st.markdown(f"[🔗 Aç / İndir]({doc_url})")
                     st.markdown("---")
             else:
-                st.warning("Henüz veritabanında belge yok.")
+                st.warning("Veritabanında henüz belge yok.")
         except Exception as e:
             st.error(f"Hata: {e}")
