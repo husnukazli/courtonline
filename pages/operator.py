@@ -53,7 +53,12 @@ else:
                     dosya_verisi = dosya.read()
                     
                     try:
-                        supabase.storage.from_("Belgeler").upload(dosya_adi, dosya_verisi, file_options={"upsert": "true"})
+                        # KRİTİK DÜZELTME: content-type application/pdf olarak ayarlandı
+                        supabase.storage.from_("Belgeler").upload(
+                            dosya_adi, 
+                            dosya_verisi, 
+                            file_options={"upsert": "true", "content-type": "application/pdf"}
+                        )
                         
                         res_url = supabase.storage.from_("Belgeler").get_public_url(dosya_adi)
                         dosya_url = res_url.get('publicUrl') if isinstance(res_url, dict) else str(res_url)
