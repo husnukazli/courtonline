@@ -3,10 +3,6 @@ import pandas as pd
 import re
 from supabase import create_client, Client
 
-url = st.secrets["supabase"]["url"]
-key = st.secrets["supabase"]["key"]
-supabase: Client = create_client(url, key)
-
 TENNIS_SOZLugu = {
     "top": ["ball", "balls"],
     "top değişimi": ["ball change", "change of balls"],
@@ -22,10 +18,22 @@ TENNIS_SOZLugu = {
     "sağlık": ["medical", "injury", "treatment"]
 }
 
+def supabase_baglantisi_kur():
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    return create_client(url, key)
+
 def hakem_panelini_ciz():
     st.title("🎾 Başhakem Dijital Asistanı")
     st.markdown("Talimatlarda arama yapın veya kütüphane indeksini inceleyin.")
     st.markdown("---")
+
+    # Güvenli Bağlantı (Fonksiyon içinde çağrıldığı için başlangıçta çökme yapmaz)
+    try:
+        supabase = supabase_baglantisi_kur()
+    except Exception as e:
+        st.error("⚠️ Supabase bağlantı ayarları (Secrets) yüklenemedi. Lütfen Streamlit Cloud Secrets bölümünü kontrol edin.")
+        return
 
     sekme_arama, sekme_indeks = st.tabs(["🔍 Kural Arama", "📚 Belge İndeksi & Kütüphane"])
 
@@ -107,7 +115,6 @@ def hakem_panelini_ciz():
                                     sayfa_bilgi = f" | 📌 Sayfa: {kayit.get('sayfa_no', 'Bilinmiyor')}" if kayit.get('sayfa_no') else ""
                                     st.markdown(f"📄 **Belge:** {kayit['dosya_adi']} *({kayit['kategori']}){sayfa_bilgi}*")
                                     
-                                    # Güvenli URL Çıkarımı (Çökme Önleyici)
                                     pdf_url = kayit['dosya_url']
                                     if isinstance(pdf_url, dict):
                                         pdf_url = pdf_url.get('publicUrl', '')
