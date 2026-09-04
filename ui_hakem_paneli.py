@@ -1,17 +1,21 @@
 import streamlit as st
+from supabase import create_client, Client
+
+# Supabase Bağlantısı
+url = st.secrets["supabase"]["url"]
+key = st.secrets["supabase"]["key"]
+supabase: Client = create_client(url, key)
 
 def hakem_panelini_ciz():
     st.title("🎾 Başhakem Dijital Asistanı")
-    st.markdown("Sahada hızlı, doğru ve net kararlar için güncel talimatlarda arama yapın.")
+    st.markdown("Sahada hızlı karar için talimatlarda kelime bazlı arama yapın.")
     st.markdown("---")
 
-    # Hangi kategorinin seçili olduğunu hafızada tutuyoruz
     if 'aktif_kategori' not in st.session_state:
         st.session_state.aktif_kategori = "Kategori Seçilmedi"
 
     st.subheader("Kategori Seçin")
     
-    # Kalıcı Aksiyon Butonları (Açılır menü kullanılmamıştır)
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -42,27 +46,52 @@ def hakem_panelini_ciz():
 
     st.markdown("---")
     
-    # Tüm talimatlarda arama için vurgulu premium/pro buton
     if st.button("🌐 Tüm Talimatlarda Aynı Anda Ara (Pro)", type="primary", use_container_width=True):
         st.session_state.aktif_kategori = "Tüm Talimatlar"
 
     st.markdown("---")
     
-    # Hakeme nerede arama yaptığını gösteren uyarı alanı
     if st.session_state.aktif_kategori == "Kategori Seçilmedi":
         st.warning("Lütfen yukarıdan arama yapmak istediğiniz talimatı seçin.")
     else:
-        st.success(f"📍 **Aktif Kategori:** {st.session_state.aktif_kategori}")
+        st.success(f"📍 **Aktif Kategori / Arama Alanı:** {st.session_state.aktif_kategori}")
 
-        # Sohbet / Arama Kutusu
-        mesaj = st.chat_input("Örn: 14 yaşta top değişimi kuralı nedir?")
+        # Arama Kutusu
+        aranan_kelime = st.chat_input("Örn: top değişimi, mola, hakem kararı...")
         
-        if mesaj:
-            # Kullanıcının sorusunu ekrana basıyoruz
+        if aranan_kelime:
             with st.chat_message("user"):
-                st.write(mesaj)
+                st.write(aranan_kelime)
                 
-            # Yapay Zeka cevap alanı (Şimdilik yer tutucu)
             with st.chat_message("assistant"):
-                st.write(f"*{st.session_state.aktif_kategori} veritabanı taranıyor...*")
-                st.info("Buraya Supabase'den çekilen belgelere göre Gemini 1.5 Flash'tan dönen cevap gelecek.")
+                with st.spinner("Supabase veri tabanında taranıyor..."):
+                    try:
+                        # Supabase Sorgusu (Esnek ve Büyük/Küçük Harf Duyarsız - ILIKE)
+                        sorgu = supabase.table("kural_icerikleri").select("dosya_adi, kategori, dosya_url, icerik")
+                        
+                        # Eğer "Tüm Talimatlar" seçilmediyse kategoriye göre filtrele
+                        if st.session_state.aktif_kategori != "Tüm Talimatlar":
+                            sorgu = sorgu.eq("kategori", st.session_state.aktif_kategori)
+                        
+                        # Kelimeyi esnek aratmak için her iki başına % ekliyoruz (ILIKE)
+                        sonuclar = sorgu.ilike("icerik", f"%{aranan_kelime}%").execute().data
+                        
+                        if sonuclar:
+                            st.success(f"Bulunan ilgili belge sayısı: {len(sonuclar)}")
+                            for kayit in sonuclar:
+                                st.markdown(f"📄 **Belge:** {kayit['dosya_adi']} *({kayit['kategori']})*")
+                                st.markdown(f"🔗 [Orijinal PDF Dosyasını Aç]({kayit['dosya_url']})")
+                                
+                                # Metin içinden aranan kelimenin geçtiği ilk 300 karakterlik kısmı kesip önizleme verelim
+                                metin = kayit['icerik']
+                                idx = metin.lower().find(aranan_kelime.lower())
+                                if idx != -1:
+                                    baslangic = max(0, idx - 100)
+                                    bitis = min(len(metin), idx + 300)
+                                    kesit = metin[baslangic:bitis]
+                                    st.info(f"...{kesit}...")
+                                st.markdown("---")
+                        else:
+                            st.warning(f"'{aranan_kelime}' kelimesi seçilen kategorideki belgelerde bulunamadı.")
+                    except Exception as e:
+                        st.error(f"Arama sırasında hata oluştu: {e}")
