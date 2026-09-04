@@ -3,19 +3,32 @@ import pandas as pd
 import re
 from supabase import create_client, Client
 
+# Kapsamlı Tenis Hakemlik ve Kural Sözlüğü (Türkçe <-> İngilizce Resmi Terimler)
 TENNIS_SOZLugu = {
     "top": ["ball", "balls"],
     "top değişimi": ["ball change", "change of balls"],
-    "mola": ["break", "rest", "toilet break", "medical time-out", "mto", "rest period"],
-    "servis": ["serve", "service", "let", "fault"],
-    "itiraz": ["appeal", "challenge", "review", "hawk-eye"],
-    "uzatma": ["tie-break", "tiebreak"],
-    "hakem": ["umpire", "referee", "supervisor", "chair umpire"],
-    "diskalifiye": ["default", "disqualification", "code violation"],
-    "kod ihlali": ["code violation", "penalty", "warnings"],
-    "hava": ["weather", "suspension", "interruption", "heat rule", "bad weather"],
-    "tuvalet": ["toilet break", "restroom"],
-    "sağlık": ["medical", "injury", "treatment"]
+    "mola": ["break", "rest", "toilet break", "medical time-out", "mto", "rest period", "changeover", "heat rule"],
+    "servis": ["serve", "service", "let", "fault", "service fault", "second serve", "foot fault"],
+    "itiraz": ["appeal", "challenge", "review", "hawk-eye", "electronic review"],
+    "uzatma": ["tie-break", "tiebreak", "match tie-break", "set tie-break", "super tie-break"],
+    "hakem": ["umpire", "referee", "supervisor", "chair umpire", "roving umpire", "chief", "line umpire"],
+    "diskalifiye": ["default", "disqualification", "code violation", "expulsion"],
+    "kod ihlali": ["code violation", "penalty", "warnings", "point penalty", "game penalty", "unsportsmanlike"],
+    "hakaret": ["verbal abuse", "obscenity", "profanity"],
+    "suistimal": ["abuse", "ball abuse", "racket abuse", "equipment abuse", "physical abuse"],
+    "hava": ["weather", "suspension", "interruption", "heat rule", "bad weather", "inclement weather"],
+    "tuvalet": ["toilet break", "restroom", "change of attire"],
+    "sağlık": ["medical", "injury", "treatment", "bleed time", "evaluation", "trainer", "doctor"],
+    "ceza": ["penalty", "fine", "suspension", "point penalty", "default", "time penalty", "code violation"],
+    "çekilme": ["retirement", "withdrawal", "walkover", "w/o", "ret"],
+    "hükmen": ["walkover", "default", "w/o", "bye"],
+    "kura": ["draw", "seeding", "qualifying", "lucky loser", "alternate", "withdrawal", "wild card"],
+    "koçluk": ["coaching", "communication", "instruction"],
+    "gecikme": ["time violation", "delay", "continuous play", "warm-up", "starting time", "punctuality"],
+    "seyirci": ["spectator", "crowd", "interruption", "noise", "behavior"],
+    "forma": ["attire", "clothing", "shoes", "commercial identification", "logos", "white clothing", "dress code"],
+    "katılım": ["sign-in", "entry", "withdrawal", "acceptance list", "deadline", "entry fee"],
+    "ısınma": ["warm-up", "practice", "hitting session"]
 }
 
 def supabase_baglantisi_kur():
@@ -28,7 +41,6 @@ def hakem_panelini_ciz():
     st.markdown("Talimatlarda arama yapın veya kütüphane indeksini inceleyin.")
     st.markdown("---")
 
-    # Güvenli Bağlantı (Fonksiyon içinde çağrıldığı için başlangıçta çökme yapmaz)
     try:
         supabase = supabase_baglantisi_kur()
     except Exception as e:
@@ -43,28 +55,32 @@ def hakem_panelini_ciz():
 
         st.subheader("Kategori Seçin")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             if st.button("🏆 ITF Kuralları", use_container_width=True):
                 st.session_state.aktif_kategori = "ITF Kuralları"
+            if st.button("🌟 ITF Junior", use_container_width=True):
+                st.session_state.aktif_kategori = "ITF Junior"
+                
+        with col2:
             if st.button("🌍 ATP", use_container_width=True):
                 st.session_state.aktif_kategori = "ATP"
             if st.button("👑 WTA", use_container_width=True):
                 st.session_state.aktif_kategori = "WTA"
+                
+        with col3:
             if st.button("🏟️ Grand Slam", use_container_width=True):
                 st.session_state.aktif_kategori = "Grand Slam"
-                
-        with col2:
             if st.button("🇪🇺 Tennis Europe", use_container_width=True):
                 st.session_state.aktif_kategori = "Tennis Europe"
             if st.button("🇹🇷 TTF Ulusal", use_container_width=True):
                 st.session_state.aktif_kategori = "TTF Ulusal"
+                
+        with col4:
             if st.button("🏅 Masters", use_container_width=True):
                 st.session_state.aktif_kategori = "Masters"
-                
-        with col3:
-            if st.button("♿ Tekerlekli Sandalye", use_container_width=True):
+            if st.button("♿ Tekerlekli S.", use_container_width=True):
                 st.session_state.aktif_kategori = "Tekerlekli Sandalye"
             if st.button("🏖️ Beach Tennis", use_container_width=True):
                 st.session_state.aktif_kategori = "Beach Tennis"
@@ -83,20 +99,20 @@ def hakem_panelini_ciz():
         else:
             st.success(f"📍 **Aktif Kategori / Arama Alanı:** {st.session_state.aktif_kategori}")
 
-            aranan_kelime = st.chat_input("Örn: mola, top değişimi, toilet break...")
+            aranan_kelime = st.chat_input("Örn: mola, top değişimi, coaching, default...")
             
             if aranan_kelime:
                 with st.chat_message("user"):
                     st.write(aranan_kelime)
                     
                 with st.chat_message("assistant"):
-                    with st.spinner("Veritabanı ve yerleşik sözlük taranıyor..."):
+                    with st.spinner("Genişletilmiş sözlük ve veritabanı taranıyor..."):
                         try:
                             aranan_lower = aranan_kelime.lower().strip()
                             aranacak_terimler = [aranan_lower]
                             
                             for tr_key, en_list in TENNIS_SOZLugu.items():
-                                if tr_key in aranan_lower:
+                                if tr_key in aranan_lower or aranan_lower in tr_key:
                                     aranacak_terimler.extend(en_list)
                             
                             sorgu = supabase.table("kural_icerikleri").select("dosya_adi, kategori, sayfa_no, dosya_url, icerik")
@@ -143,7 +159,7 @@ def hakem_panelini_ciz():
                                         
                                     st.markdown("---")
                             else:
-                                st.warning(f"'{aranan_kelime}' (veya sözlük karşılıkları) seçilen kategoride bulunamadı.")
+                                st.warning(f"'{aranan_kelime}' (veya genişletilmiş sözlük karşılıkları) seçilen kategoride bulunamadı.")
                         except Exception as e:
                             st.error(f"Arama sırasında hata oluştu: {e}")
 
