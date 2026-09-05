@@ -112,7 +112,7 @@ else:
                                     
                                     toplam_sayfa_kaydi += 1
                                     
-                        st.success(f"'{orijinal_ad}' -> '{temiz_dosya_adi' olarak başarıyla işlendi (Toplam {len(pdf.pages)} sayfa).")
+                        st.success(f"'{orijinal_ad}' -> '{temiz_dosya_adi}' olarak başarıyla işlendi (Toplam {len(pdf.pages)} sayfa).")
                     except Exception as e:
                         st.warning(f"'{orijinal_ad}' işlenirken hata oluştu: {e}")
                 
@@ -124,7 +124,9 @@ else:
     with sekme2:
         st.subheader("Yüklenmiş Belgeler Arşivi")
         try:
-            response = supabase.table("kural_icerikleri").select("dosya_adi, kategori, dosya_url").execute()
+            # GİZLİ 1000 SATIR SINIRINI KALDIRMAK İÇİN .limit(10000) EKLENDİ
+            response = supabase.table("kural_icerikleri").select("dosya_adi, kategori, dosya_url").limit(10000).execute()
+            
             if response.data:
                 df = pd.DataFrame(response.data)
                 df_unique = df.drop_duplicates(subset=["dosya_adi"]).sort_values(by="dosya_adi", ascending=True).reset_index(drop=True)
