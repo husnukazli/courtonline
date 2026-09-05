@@ -56,35 +56,42 @@ def hakem_panelini_ciz():
 
         st.subheader("Kategori Seçin")
         
+        # Kategoriler 4 gruba mantıklı şekilde ayrıldı
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             if st.button("🏆 ITF Kuralları", use_container_width=True):
                 st.session_state.aktif_kategori = "ITF Kuralları"
-            if st.button("🌟 ITF Junior", use_container_width=True):
-                st.session_state.aktif_kategori = "ITF Junior"
+            if st.button("👨 Men's WTT", use_container_width=True):
+                st.session_state.aktif_kategori = "Men's World Tennis Tour"
+            if st.button("👩 Women's WTT", use_container_width=True):
+                st.session_state.aktif_kategori = "Women's World Tennis Tour"
+            if st.button("🌟 WTT Juniors", use_container_width=True):
+                st.session_state.aktif_kategori = "World Tennis Tour Juniors"
                 
         with col2:
+            if st.button("🏅 WTT Masters", use_container_width=True):
+                st.session_state.aktif_kategori = "World Tennis Masters Tour"
+            if st.button("♿ Wheelchair Tour", use_container_width=True):
+                st.session_state.aktif_kategori = "Wheelchair Tennis Tour"
+            if st.button("🏖️ Beach Tennis", use_container_width=True):
+                st.session_state.aktif_kategori = "Beach Tennis World Tour"
+            if st.button("🇪🇺 Tennis Europe", use_container_width=True):
+                st.session_state.aktif_kategori = "Tennis Europe"
+                
+        with col3:
             if st.button("🌍 ATP", use_container_width=True):
                 st.session_state.aktif_kategori = "ATP"
             if st.button("👑 WTA", use_container_width=True):
                 st.session_state.aktif_kategori = "WTA"
-                
-        with col3:
             if st.button("🏟️ Grand Slam", use_container_width=True):
                 st.session_state.aktif_kategori = "Grand Slam"
-            if st.button("🇪🇺 Tennis Europe", use_container_width=True):
-                st.session_state.aktif_kategori = "Tennis Europe"
-            if st.button("🇹🇷 TTF Ulusal", use_container_width=True):
-                st.session_state.aktif_kategori = "TTF Ulusal"
                 
         with col4:
-            if st.button("🏅 Masters", use_container_width=True):
-                st.session_state.aktif_kategori = "Masters"
-            if st.button("♿ Tekerlekli S.", use_container_width=True):
-                st.session_state.aktif_kategori = "Tekerlekli Sandalye"
-            if st.button("🏖️ Beach Tennis", use_container_width=True):
-                st.session_state.aktif_kategori = "Beach Tennis"
+            if st.button("🇹🇷 TTF Ulusal", use_container_width=True):
+                st.session_state.aktif_kategori = "TTF Ulusal"
+            if st.button("🏫 Ulusal Diğer", use_container_width=True):
+                st.session_state.aktif_kategori = "Ulusal Diğer"
             if st.button("📌 Sık Sorulanlar", use_container_width=True):
                 st.session_state.aktif_kategori = "Sık Sorulanlar"
 
