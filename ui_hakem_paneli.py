@@ -17,8 +17,8 @@ def supabase_baglantisi_kur():
 def yapay_zeka_ayarla():
     try:
         genai.configure(api_key=st.secrets["gemini"]["api_key"])
-        # API versiyonuyla tam uyumlu ve uzun metinleri anında okuyan 'flash' modelini kullanıyoruz
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # v1beta uyumsuzluğunu aşmak için en kararlı güncel takma adı kullanıyoruz
+        model = genai.GenerativeModel('gemini-flash-latest')
         return model
     except Exception as e:
         st.error("Gemini API anahtarı ayarlanırken bir sorun oluştu.")
