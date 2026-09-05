@@ -5,7 +5,7 @@ import urllib.parse
 from supabase import create_client, Client
 import google.generativeai as genai
 
-# Sözlüğü yeni oluşturduğumuz dosyadan içe aktarıyoruz
+# Sözlüğü ayrı dosyadan içe aktarıyoruz
 from sozluk import TENNIS_SOZLugu
 
 def supabase_baglantisi_kur():
@@ -17,7 +17,7 @@ def supabase_baglantisi_kur():
 def yapay_zeka_ayarla():
     try:
         genai.configure(api_key=st.secrets["gemini"]["api_key"])
-        # v1beta uyumsuzluğunu aşmak için en kararlı güncel takma adı kullanıyoruz
+        # En kararlı ve güncel genel model alias'ı
         model = genai.GenerativeModel('gemini-flash-latest')
         return model
     except Exception as e:
@@ -93,7 +93,6 @@ def hakem_panelini_ciz():
                             aranan_ilk = re.sub(r'\s+', ' ', aranan_ilk)
                             temel_terimler = {aranan_ilk}
                             
-                            # Katı Sözlük Eşleştirmesi
                             for tr_key, en_list in TENNIS_SOZLugu.items():
                                 if aranan_ilk == tr_key or aranan_ilk in en_list:
                                     temel_terimler.add(tr_key)
@@ -166,17 +165,17 @@ def hakem_panelini_ciz():
                         except Exception as e:
                             st.error(f"Arama sırasında hata oluştu: {e}")
 
-    # ------------------ 2. YAPAY ZEKA SEKMESİ ------------------
+    # ------------------ 2. YAPAY ZEKA SEKMESİ (Optimize Edilmiş) ------------------
     with sekme_ai:
         st.subheader("🤖 Yapay Zeka Başhakem Yardımcısı")
-        st.markdown("Sahada gerçekleşen olayı anlatın, yapay zeka ilgili kural kitapçığını okuyup kararı size söylesin.")
+        st.markdown("Sahada gerçekleşen olayı anlatın, yapay zeka ilgili sayfaları tarayıp kararı size söylesin.")
         
         if st.session_state.aktif_kategori == "Kategori Seçilmedi" or st.session_state.aktif_kategori == "Tüm Talimatlar":
             st.warning("Lütfen yukarıdaki Arama sekmesinden okutmak istediğiniz tek bir Kategori seçin.")
         elif not ai_model:
             st.warning("Gemini API hazır değil. Lütfen ayarlarınızı kontrol edin.")
         else:
-            st.info(f"Yapay Zeka şu an **{st.session_state.aktif_kategori}** kurallarını baz alarak cevap verecek.")
+            st.info(f"Yapay Zeka şu an **{st.session_state.aktif_kategori}** içindeki ilgili maddeleri tarayacak.")
             
             olay_metni = st.chat_input("Olayı anlatın (Örn: Oyuncu top toplayıcıya bağırdı, ne yapmalıyım?)...", key="ai_input")
             
@@ -185,38 +184,47 @@ def hakem_panelini_ciz():
                     st.write(olay_metni)
                 
                 with st.chat_message("assistant"):
-                    with st.spinner(f"Gemini {st.session_state.aktif_kategori} kurallarını okuyor ve analiz ediyor..."):
+                    with st.spinner("İlgili kural sayfaları filtreleniyor ve yapay zeka analiz ediyor..."):
                         try:
-                            # Seçili kategorideki metinleri çek (AI'nin okuması için)
-                            response = supabase.table("kural_icerikleri").select("sayfa_no, icerik").eq("kategori", st.session_state.aktif_kategori).execute()
+                            # Sadece ilgili sayfaları çekerek kota aşımını engelliyoruz
+                            kelimeler = [k.lower().strip() for k in olay_metni.split() if len(k) > 2]
+                            sorgu = supabase.table("kural_icerikleri").select("sayfa_no, icerik").eq("kategori", st.session_state.aktif_kategori)
+                            
+                            if kelimeler:
+                                filtre_parcalari = [f"icerik.ilike.%{k}%" for k in kelimeler[:4]]
+                                sorgu = sorgu.or_(",".join(filtre_parcalari))
+                            
+                            response = sorgu.limit(15).execute()
+                            
                             tum_metin = ""
                             if response.data:
                                 for satir in response.data:
                                     tum_metin += f"\n--- Sayfa {satir['sayfa_no']} ---\n{satir['icerik']}\n"
                             
                             if not tum_metin:
-                                st.warning("Bu kategoride kural metni bulunamadı.")
-                            else:
-                                # Gemini'a gönderilecek özel prompt
-                                prompt = f"""
-                                Sen uluslararası yetkili bir Tenis Başhakemisin (Gold Badge).
-                                
-                                Sana aşağıdaki resmi tenis kuralları dokümanını veriyorum:
-                                KURAL METİNLERİ:
-                                {tum_metin}
-                                
-                                HAKEMİN SORDUĞU OLAY:
-                                "{olay_metni}"
-                                
-                                GÖREVİN:
-                                Sadece yukarıda verdiğim kural metinlerine dayanarak bu olayın kural ihlali olup olmadığını, hakemin hangi kararı vermesi gerektiğini (ve varsa cezasını) net ve profesyonel bir dille açıkla.
-                                Cevabının sonuna, kararı dayandırdığın 'Sayfa Numarasını' (örneğin: Kaynak: Sayfa 45) mutlaka ekle.
-                                Eğer olay kural metinlerinde geçmiyorsa "Bu duruma uygun spesifik bir kural bulunamadı" de.
-                                """
-                                
-                                cevap = ai_model.generate_content(prompt)
-                                st.markdown(cevap.text)
-                                
+                                yedek_resp = supabase.table("kural_icerikleri").select("sayfa_no, icerik").eq("kategori", st.session_state.aktif_kategori).limit(10).execute()
+                                for satir in yedek_resp.data:
+                                    tum_metin += f"\n--- Sayfa {satir['sayfa_no']} ---\n{satir['icerik']}\n"
+                            
+                            prompt = f"""
+                            Sen uluslararası yetkili bir Tenis Başhakemisin (Gold Badge).
+                            
+                            Sana resmi tenis kuralları dokümanından derlenen ilgili sayfaları veriyorum:
+                            KURAL METİNLERİ:
+                            {tum_metin}
+                            
+                            HAKEMİN SORDUĞU OLAY:
+                            "{olay_metni}"
+                            
+                            GÖREVİN:
+                            Sadece yukarıda verdiğim kural metinlerine dayanarak bu olayın kural ihlali olup olmadığını, hakemin hangi kararı vermesi gerektiğini (ve varsa cezasını) net ve profesyonel bir dille açıkla.
+                            Cevabının sonuna, kararı dayandırdığın 'Sayfa Numarasını' mutlaka ekle.
+                            Eğer olay metinlerde geçmiyorsa "Bu duruma uygun spesifik kural bulunamadı" de.
+                            """
+                            
+                            cevap = ai_model.generate_content(prompt)
+                            st.markdown(cevap.text)
+                            
                         except Exception as e:
                             st.error(f"Yapay Zeka analizi sırasında hata oluştu: {e}")
 
