@@ -106,29 +106,56 @@ def hakem_panelini_ciz():
         else:
             st.success(f"**Aktif Kategori / Arama Alanı:** {st.session_state.aktif_kategori}")
 
-            aranan_kelime = st.chat_input("Örn: mola, top değişimi, coaching, default...")
+            aranan_kelime = st.chat_input("Örn: mola, top değişimi, coaching, default, tiebreak...")
             
             if aranan_kelime:
                 with st.chat_message("user"):
                     st.write(aranan_kelime)
                     
                 with st.chat_message("assistant"):
-                    with st.spinner("Genişletilmiş sözlük ve veritabanı taranıyor..."):
+                    with st.spinner("Varyasyonlar hesaplanıyor ve veritabanı taranıyor..."):
                         try:
-                            aranan_lower = aranan_kelime.lower().strip()
-                            aranacak_terimler = [aranan_lower]
-                            
+                            # Adım 1: Kullanıcı girdisini normalize et
+                            aranan_ilk = aranan_kelime.lower().strip()
+                            aranan_ilk = re.sub(r'\s+', ' ', aranan_ilk) # Fazla boşlukları temizle
+                            aranan_saf = aranan_ilk.replace(" ", "").replace("-", "") # Sıfır tolerans (boşluksuz/tiresiz form)
+
+                            temel_terimler = set([aranan_ilk])
+
+                            # Adım 2: Sözlükte Çift Yönlü ve Esnek Arama
                             for tr_key, en_list in TENNIS_SOZLugu.items():
-                                if tr_key in aranan_lower or aranan_lower in tr_key:
-                                    aranacak_terimler.extend(en_list)
+                                tr_saf = tr_key.replace(" ", "").replace("-", "")
+                                en_saf_listesi = [kelime.replace(" ", "").replace("-", "") for kelime in en_list]
+                                
+                                # Eğer kullanıcının girdiği kelimenin "saf" hali, sözlükteki herhangi bir kelimenin "saf" haliyle eşleşiyorsa
+                                if (aranan_saf in tr_saf) or any(aranan_saf in en_saf for en_saf in en_saf_listesi):
+                                    temel_terimler.add(tr_key)
+                                    temel_terimler.update(en_list)
+
+                            # Adım 3: Tüm bulunan terimlerin varyasyonlarını (boşluklu, bitişik, tireli) üret
+                            aranacak_terimler = set()
+                            for terim in temel_terimler:
+                                terim = terim.strip()
+                                aranacak_terimler.add(terim)
+                                if ' ' in terim:
+                                    aranacak_terimler.add(terim.replace(' ', ''))       # örn: foot fault -> footfault
+                                    aranacak_terimler.add(terim.replace(' ', '-'))      # örn: foot fault -> foot-fault
+                                if '-' in terim:
+                                    aranacak_terimler.add(terim.replace('-', ''))       # örn: tie-break -> tiebreak
+                                    aranacak_terimler.add(terim.replace('-', ' '))      # örn: tie-break -> tie break
+                                    
+                            aranacak_terimler_listesi = list(aranacak_terimler)
                             
+                            # Adım 4: Veritabanında (ilike ile büyük/küçük harf duyarsız) sorgu oluştur
                             sorgu = supabase.table("kural_icerikleri").select("dosya_adi, kategori, sayfa_no, dosya_url, icerik")
                             
                             if st.session_state.aktif_kategori != "Tüm Talimatlar":
                                 sorgu = sorgu.eq("kategori", st.session_state.aktif_kategori)
                             
-                            filtre_parcalari = [f"icerik.ilike.%{terim}%" for terim in aranacak_terimler]
+                            # Tüm varyasyonları içeren OR (veya) sorgusu zinciri oluştur
+                            filtre_parcalari = [f"icerik.ilike.%{terim}%" for terim in aranacak_terimler_listesi]
                             sorgu = sorgu.or_(",".join(filtre_parcalari))
+                            
                             sonuclar = sorgu.execute().data
                             
                             if sonuclar:
@@ -143,28 +170,36 @@ def hakem_panelini_ciz():
                                         pdf_url = pdf_url.get('publicUrl', '')
                                     
                                     metin = kayit['icerik']
-                                    bul_terim = aranan_lower if aranan_lower in metin.lower() else aranacak_terimler[0]
+                                    metin_lower = metin.lower()
+                                    
+                                    # Metin içinde bizim ürettiğimiz varyasyonlardan HANGİSİNİN geçtiğini tespit et
+                                    bulunan_varyasyon = aranacak_terimler_listesi[0] # Varsayılan
+                                    for varyasyon in aranacak_terimler_listesi:
+                                        if varyasyon in metin_lower:
+                                            bulunan_varyasyon = varyasyon
+                                            break
                                     
                                     if pdf_url:
-                                        url_kodlu_terim = urllib.parse.quote(f'"{bul_terim}"')
+                                        # Hangi varyasyon (boşluklu/tireli vs.) bulunduysa tarayıcıya onu highlight ettiriyoruz
+                                        url_kodlu_terim = urllib.parse.quote(f'"{bulunan_varyasyon}"')
                                         hedefli_url = f"{pdf_url}#page={sayfa_no}&search={url_kodlu_terim}"
                                         
                                         st.markdown(
                                             f'''<a href="{hedefli_url}" target="_blank" 
                                             style="background-color: #2e3034; color: #39ff14; padding: 8px 12px; border-radius: 6px; text-decoration: none; display: inline-block; margin-bottom: 10px; font-weight: bold; border: 1px solid #39ff14;">
-                                            {sayfa_no}. Sayfayı Doğrudan Aç ve "{bul_terim}" Kelimesine Git
+                                            {sayfa_no}. Sayfayı Aç ve "{bulunan_varyasyon}" Kelimesini Vurgula
                                             </a>''', 
                                             unsafe_allow_html=True
                                         )
                                     
-                                    idx = metin.lower().find(bul_terim)
-                                    
+                                    idx = metin_lower.find(bulunan_varyasyon)
                                     if idx != -1:
                                         baslangic = max(0, idx - 120)
                                         bitis = min(len(metin), idx + 350)
                                         kesit = metin[baslangic:bitis].replace("\n", " ")
                                         
-                                        pattern = re.compile(re.escape(bul_terim), re.IGNORECASE)
+                                        # Kesin eşleşen varyasyonu yeşil neon renkle highlight et
+                                        pattern = re.compile(re.escape(bulunan_varyasyon), re.IGNORECASE)
                                         vurgulu_kesit = pattern.sub(
                                             lambda m: f'<span style="background-color: #39ff14; color: #000000; font-weight: bold; padding: 2px 4px; border-radius: 3px;">{m.group(0)}</span>', 
                                             kesit
@@ -176,7 +211,7 @@ def hakem_panelini_ciz():
                                         
                                     st.markdown("---")
                             else:
-                                st.warning(f"'{aranan_kelime}' (veya sözlük karşılıkları) seçilen kategoride bulunamadı.")
+                                st.warning(f"'{aranan_kelime}' veya alternatif varyasyonları seçilen kategoride bulunamadı.")
                         except Exception as e:
                             st.error(f"Arama sırasında hata oluştu: {e}")
 
