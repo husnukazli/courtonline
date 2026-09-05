@@ -54,13 +54,13 @@ else:
                     dosya_verisi = dosya.read()
                     
                     try:
-                        # KESİN ÇÖZÜM: Eski dosyayı metadata hatasını önlemek için veritabanından tamamen uçuruyoruz
+                        # Eski dosya varsa depodan temizle
                         try:
                             supabase.storage.from_("Belgeler").remove([dosya_adi])
                         except:
-                            pass # Eğer dosya zaten yoksa hata vermemesi için sessizce geç
+                            pass 
                         
-                        # Tertemiz yeni dosyayı garantili PDF kimliğiyle yüklüyoruz
+                        # Dosyayı kesin PDF kimliğiyle yükle
                         file_options = {
                             "content-type": "application/pdf"
                         }
@@ -74,6 +74,9 @@ else:
                         res_url = supabase.storage.from_("Belgeler").get_public_url(dosya_adi)
                         dosya_url = res_url.get('publicUrl') if isinstance(res_url, dict) else str(res_url)
                         
+                        # Eski veritabanı kayıtlarını sil (Üzerine yazmayı önlemek için)
+                        supabase.table("kural_icerikleri").delete().eq("dosya_adi", dosya_adi).execute()
+
                         with pdfplumber.open(io.BytesIO(dosya_verisi)) as pdf:
                             for sayfa_index, sayfa in enumerate(pdf.pages):
                                 metin = sayfa.extract_text()
@@ -110,9 +113,11 @@ else:
                 st.info(f"Toplam Benzersiz Belge Sayısı: **{len(df_unique)}**")
                 
                 for idx, row in df_unique.iterrows():
-                    col1, col2, col3 = st.columns([3, 2, 1])
+                    col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
+                    dosya_adi_sil = row['dosya_adi']
+                    
                     with col1:
-                        st.markdown(f"**{idx+1}. {row['dosya_adi']}**")
+                        st.markdown(f"**{idx+1}. {dosya_adi_sil}**")
                     with col2:
                         st.caption(f"Kategori: {row['kategori']}")
                     with col3:
@@ -121,6 +126,19 @@ else:
                             doc_url = doc_url.get('publicUrl', '')
                         if doc_url:
                             st.markdown(f"[Aç / İndir]({doc_url})")
+                    with col4:
+                        # GERİ EKLENEN SİLME BUTONU
+                        if st.button("Sil", key=f"sil_{dosya_adi_sil}"):
+                            # 1. Veritabanındaki tüm sayfa kayıtlarını temizle
+                            supabase.table("kural_icerikleri").delete().eq("dosya_adi", dosya_adi_sil).execute()
+                            # 2. Fiziksel dosyayı depodan temizle
+                            try:
+                                supabase.storage.from_("Belgeler").remove([dosya_adi_sil])
+                            except:
+                                pass
+                            st.success(f"{dosya_adi_sil} sistemden tamamen silindi!")
+                            st.rerun()
+                            
                     st.markdown("---")
             else:
                 st.warning("Veritabanında henüz belge yok.")
