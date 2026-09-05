@@ -17,7 +17,6 @@ def supabase_baglantisi_kur():
 def yapay_zeka_ayarla():
     try:
         genai.configure(api_key=st.secrets["gemini"]["api_key"])
-        # En kararlı ve güncel genel model alias'ı
         model = genai.GenerativeModel('gemini-flash-latest')
         return model
     except Exception as e:
@@ -26,7 +25,7 @@ def yapay_zeka_ayarla():
 
 def hakem_panelini_ciz():
     st.title("Başhakem Dijital Asistanı")
-    st.markdown("Kural arayın, kütüphaneyi inceleyin veya **Yapay Zekaya olayı anlatıp çözdürün.**")
+    st.markdown("Kural arayın, kütüphaneyi inceleyin veya **bulduğunuz kuralı doğrudan Yapay Zekaya yorumlatın.**")
     st.markdown("---")
 
     try:
@@ -37,10 +36,10 @@ def hakem_panelini_ciz():
         
     ai_model = yapay_zeka_ayarla()
 
-    # 3 Sekmeli Yapı: Arama, Yapay Zeka, İndeks
-    sekme_arama, sekme_ai, sekme_indeks = st.tabs(["🔍 Kural Arama", "🤖 AI Olay Çözücü", "📚 Belge İndeksi"])
+    # 3 Sekmeli Yapı
+    sekme_arama, sekme_ai, sekme_indeks = st.tabs(["🔍 Kural Arama", "🤖 Genel AI Olay Çözücü", "📚 Belge İndeksi"])
 
-    # ------------------ 1. KLASİK ARAMA SEKMESİ ------------------
+    # ------------------ 1. KLASİK ARAMA VE MİKRO-AI SEKMESİ ------------------
     with sekme_arama:
         if 'aktif_kategori' not in st.session_state:
             st.session_state.aktif_kategori = "Kategori Seçilmedi"
@@ -80,95 +79,144 @@ def hakem_panelini_ciz():
         else:
             st.success(f"**Aktif Talimat:** {st.session_state.aktif_kategori}")
             
+            # Arama sonuçlarını ekranda tutmak için Session State başlatıyoruz
+            if "arama_sonuclari" not in st.session_state:
+                st.session_state.arama_sonuclari = None
+            if "aranan_terimler" not in st.session_state:
+                st.session_state.aranan_terimler = None
+
             aranan_kelime = st.chat_input("Aranacak kelimeyi yazın (veya mikrofona dokunun)...")
             
+            # 1. Aşama: Kelime aratıldığında veriyi çek ve hafızaya al
             if aranan_kelime:
                 with st.chat_message("user"):
                     st.write(aranan_kelime)
                     
-                with st.chat_message("assistant"):
-                    with st.spinner("Veritabanı taranıyor..."):
-                        try:
-                            aranan_ilk = aranan_kelime.lower().strip()
-                            aranan_ilk = re.sub(r'\s+', ' ', aranan_ilk)
-                            temel_terimler = {aranan_ilk}
-                            
-                            for tr_key, en_list in TENNIS_SOZLugu.items():
-                                if aranan_ilk == tr_key or aranan_ilk in en_list:
-                                    temel_terimler.add(tr_key)
-                                    temel_terimler.update(en_list)
+                with st.spinner("Veritabanı taranıyor..."):
+                    try:
+                        aranan_ilk = aranan_kelime.lower().strip()
+                        aranan_ilk = re.sub(r'\s+', ' ', aranan_ilk)
+                        temel_terimler = {aranan_ilk}
+                        
+                        for tr_key, en_list in TENNIS_SOZLugu.items():
+                            if aranan_ilk == tr_key or aranan_ilk in en_list:
+                                temel_terimler.add(tr_key)
+                                temel_terimler.update(en_list)
 
-                            aranacak_terimler = set()
-                            for terim in temel_terimler:
-                                aranacak_terimler.add(terim)
-                                if ' ' in terim:
-                                    aranacak_terimler.add(terim.replace(' ', ''))
-                                    aranacak_terimler.add(terim.replace(' ', '-'))
-                                if '-' in terim:
-                                    aranacak_terimler.add(terim.replace('-', ''))
-                                    aranacak_terimler.add(terim.replace('-', ' '))
-                                    
-                            aranacak_terimler_listesi = list(aranacak_terimler)
-                            
-                            sorgu = supabase.table("kural_icerikleri").select("dosya_adi, kategori, sayfa_no, dosya_url, icerik")
-                            if st.session_state.aktif_kategori != "Tüm Talimatlar":
-                                sorgu = sorgu.eq("kategori", st.session_state.aktif_kategori)
-                            
-                            filtre_parcalari = [f"icerik.ilike.%{terim}%" for terim in aranacak_terimler_listesi]
-                            sorgu = sorgu.or_(",".join(filtre_parcalari))
-                            
-                            sonuclar = sorgu.execute().data
-                            
-                            if sonuclar:
-                                st.success(f"Bulunan ilgili sayfa sayısı: {len(sonuclar)}")
-                                for kayit in sonuclar:
-                                    sayfa_no = kayit.get('sayfa_no', 1)
-                                    st.markdown(f"**Belge:** {kayit['dosya_adi']} *({kayit['kategori']}) | Sayfa: {sayfa_no}*")
-                                    
-                                    pdf_url = kayit['dosya_url']
-                                    if isinstance(pdf_url, dict): pdf_url = pdf_url.get('publicUrl', '')
-                                    
-                                    metin = kayit['icerik']
-                                    metin_lower = metin.lower()
-                                    
-                                    bulunan_varyasyon = aranacak_terimler_listesi[0]
-                                    for varyasyon in aranacak_terimler_listesi:
-                                        if varyasyon in metin_lower:
-                                            bulunan_varyasyon = varyasyon
-                                            break
-                                    
-                                    if pdf_url:
-                                        url_kodlu_terim = urllib.parse.quote(f'"{bulunan_varyasyon}"')
-                                        hedefli_url = f"{pdf_url}?render=true#page={sayfa_no}&search={url_kodlu_terim}"
-                                        st.markdown(
-                                            f'''<a href="{hedefli_url}" target="_blank" 
-                                            style="background-color: #2e3034; color: #39ff14; padding: 8px 12px; border-radius: 6px; text-decoration: none; display: inline-block; margin-bottom: 10px; font-weight: bold; border: 1px solid #39ff14;">
-                                            ↗️ {sayfa_no}. Sayfayı Aç ve "{bulunan_varyasyon}" Kelimesini Vurgula
-                                            </a>''', 
-                                            unsafe_allow_html=True
-                                        )
-                                    
-                                    idx = metin_lower.find(bulunan_varyasyon)
-                                    if idx != -1:
-                                        baslangic = max(0, idx - 120)
-                                        bitis = min(len(metin), idx + 350)
-                                        kesit = metin[baslangic:bitis].replace("\n", " ")
-                                        pattern = re.compile(re.escape(bulunan_varyasyon), re.IGNORECASE)
-                                        vurgulu_kesit = pattern.sub(lambda m: f'<span style="background-color: #39ff14; color: #000000; font-weight: bold; padding: 2px 4px; border-radius: 3px;">{m.group(0)}</span>', kesit)
-                                        st.markdown(f"**İlgili Bağlam:**<br>...{vurgulu_kesit}...", unsafe_allow_html=True)
-                                    else:
-                                        st.markdown(f"**İlgili Bağlam:**<br>...{metin[:300]}...", unsafe_allow_html=True)
-                                        
-                                    st.markdown("---")
-                            else:
-                                st.warning("Bu kategoride sonuç bulunamadı.")
-                        except Exception as e:
-                            st.error(f"Arama sırasında hata oluştu: {e}")
+                        aranacak_terimler = set()
+                        for terim in temel_terimler:
+                            aranacak_terimler.add(terim)
+                            if ' ' in terim:
+                                aranacak_terimler.add(terim.replace(' ', ''))
+                                aranacak_terimler.add(terim.replace(' ', '-'))
+                            if '-' in terim:
+                                aranacak_terimler.add(terim.replace('-', ''))
+                                aranacak_terimler.add(terim.replace('-', ' '))
+                                
+                        aranacak_terimler_listesi = list(aranacak_terimler)
+                        
+                        sorgu = supabase.table("kural_icerikleri").select("dosya_adi, kategori, sayfa_no, dosya_url, icerik")
+                        if st.session_state.aktif_kategori != "Tüm Talimatlar":
+                            sorgu = sorgu.eq("kategori", st.session_state.aktif_kategori)
+                        
+                        filtre_parcalari = [f"icerik.ilike.%{terim}%" for terim in aranacak_terimler_listesi]
+                        sorgu = sorgu.or_(",".join(filtre_parcalari))
+                        
+                        st.session_state.arama_sonuclari = sorgu.execute().data
+                        st.session_state.aranan_terimler = aranacak_terimler_listesi
+                    except Exception as e:
+                        st.error(f"Arama sırasında hata oluştu: {e}")
 
-    # ------------------ 2. YAPAY ZEKA SEKMESİ (Optimize Edilmiş) ------------------
+            # 2. Aşama: Hafızadaki verileri ekrana çiz
+            if st.session_state.arama_sonuclari is not None:
+                sonuclar = st.session_state.arama_sonuclari
+                aranacak_terimler_listesi = st.session_state.aranan_terimler
+                
+                if sonuclar:
+                    st.success(f"Bulunan ilgili sayfa sayısı: {len(sonuclar)}")
+                    
+                    # Sayfaları döngüye al
+                    for idx, kayit in enumerate(sonuclar):
+                        sayfa_no = kayit.get('sayfa_no', 1)
+                        st.markdown(f"**Belge:** {kayit['dosya_adi']} *({kayit['kategori']}) | Sayfa: {sayfa_no}*")
+                        
+                        pdf_url = kayit['dosya_url']
+                        if isinstance(pdf_url, dict): pdf_url = pdf_url.get('publicUrl', '')
+                        
+                        metin = kayit['icerik']
+                        metin_lower = metin.lower()
+                        
+                        bulunan_varyasyon = aranacak_terimler_listesi[0]
+                        for varyasyon in aranacak_terimler_listesi:
+                            if varyasyon in metin_lower:
+                                bulunan_varyasyon = varyasyon
+                                break
+                        
+                        # PDF Yönlendirme Linki
+                        if pdf_url:
+                            url_kodlu_terim = urllib.parse.quote(f'"{bulunan_varyasyon}"')
+                            hedefli_url = f"{pdf_url}?render=true#page={sayfa_no}&search={url_kodlu_terim}"
+                            st.markdown(
+                                f'''<a href="{hedefli_url}" target="_blank" 
+                                style="background-color: #2e3034; color: #39ff14; padding: 8px 12px; border-radius: 6px; text-decoration: none; display: inline-block; margin-bottom: 10px; font-weight: bold; border: 1px solid #39ff14;">
+                                ↗️ {sayfa_no}. Sayfayı Aç ve "{bulunan_varyasyon}" Kelimesini Vurgula
+                                </a>''', 
+                                unsafe_allow_html=True
+                            )
+                        
+                        # Metin Vurgulama
+                        idx_text = metin_lower.find(bulunan_varyasyon)
+                        if idx_text != -1:
+                            baslangic = max(0, idx_text - 120)
+                            bitis = min(len(metin), idx_text + 350)
+                            kesit = metin[baslangic:bitis].replace("\n", " ")
+                            pattern = re.compile(re.escape(bulunan_varyasyon), re.IGNORECASE)
+                            vurgulu_kesit = pattern.sub(lambda m: f'<span style="background-color: #39ff14; color: #000000; font-weight: bold; padding: 2px 4px; border-radius: 3px;">{m.group(0)}</span>', kesit)
+                            st.markdown(f"**İlgili Bağlam:**<br>...{vurgulu_kesit}...", unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"**İlgili Bağlam:**<br>...{metin[:300]}...", unsafe_allow_html=True)
+                            
+                        # YENİ EKLENEN ÖZELLİK: NOKTA ATIŞI AI YORUMLAYICI
+                        with st.expander(f"🤖 Sadece {sayfa_no}. Sayfayı Yapay Zekaya Yorumlat (Kota Dostu)"):
+                            st.caption("Yapay zeka tüm kitabı okumak yerine sadece bu sayfadaki kurala bakarak sorunuzu cevaplar. Kredi tüketimi neredeyse sıfırdır.")
+                            ai_soru = st.text_input("Olayı kısaca anlatın:", key=f"soru_{idx}")
+                            
+                            if st.button("Bu Sayfaya Göre Analiz Et", key=f"analiz_{idx}"):
+                                if not ai_soru:
+                                    st.warning("Lütfen olayı yazın.")
+                                elif not ai_model:
+                                    st.error("Gemini API hazır değil.")
+                                else:
+                                    with st.spinner("AI bu kural maddesini okuyup kararı hazırlıyor..."):
+                                        try:
+                                            # SADECE O SAYFANIN METNİNİ GÖNDERİYORUZ
+                                            prompt = f"""
+                                            Sen uluslararası yetkili bir Tenis Başhakemisin (Gold Badge).
+                                            Sadece aşağıdaki spesifik kural metnine dayanarak olayı değerlendir.
+                                            
+                                            KURAL METNİ ({kayit['dosya_adi']} - Sayfa {sayfa_no}):
+                                            {metin}
+                                            
+                                            HAKEMİN SORDUĞU OLAY:
+                                            "{ai_soru}"
+                                            
+                                            GÖREVİN: 
+                                            Bu spesifik kurala göre olayın ihlal olup olmadığını, hakemin hangi kararı vermesi gerektiğini net ve kısa bir dille açıkla.
+                                            """
+                                            cevap = ai_model.generate_content(prompt)
+                                            st.success("🤖 **Yapay Zeka Kararı:**")
+                                            st.markdown(cevap.text)
+                                        except Exception as e:
+                                            st.error(f"Yapay Zeka analizi sırasında hata oluştu: {e}")
+                                            
+                        st.markdown("---")
+                else:
+                    st.warning("Bu kategoride sonuç bulunamadı.")
+
+    # ------------------ 2. YAPAY ZEKA SEKMESİ (Geniş Çaplı Tarama) ------------------
     with sekme_ai:
-        st.subheader("🤖 Yapay Zeka Başhakem Yardımcısı")
-        st.markdown("Sahada gerçekleşen olayı anlatın, yapay zeka ilgili sayfaları tarayıp kararı size söylesin.")
+        st.subheader("🤖 Genel Yapay Zeka Başhakem Yardımcısı")
+        st.markdown("Buradan soracağınız sorular seçtiğiniz kategorideki **en alakalı ilk 15 sayfayı** tarayarak cevaplanır.")
         
         if st.session_state.aktif_kategori == "Kategori Seçilmedi" or st.session_state.aktif_kategori == "Tüm Talimatlar":
             st.warning("Lütfen yukarıdaki Arama sekmesinden okutmak istediğiniz tek bir Kategori seçin.")
@@ -176,8 +224,7 @@ def hakem_panelini_ciz():
             st.warning("Gemini API hazır değil. Lütfen ayarlarınızı kontrol edin.")
         else:
             st.info(f"Yapay Zeka şu an **{st.session_state.aktif_kategori}** içindeki ilgili maddeleri tarayacak.")
-            
-            olay_metni = st.chat_input("Olayı anlatın (Örn: Oyuncu top toplayıcıya bağırdı, ne yapmalıyım?)...", key="ai_input")
+            olay_metni = st.chat_input("Olayı anlatın...", key="ai_input_genel")
             
             if olay_metni:
                 with st.chat_message("user"):
@@ -186,7 +233,6 @@ def hakem_panelini_ciz():
                 with st.chat_message("assistant"):
                     with st.spinner("İlgili kural sayfaları filtreleniyor ve yapay zeka analiz ediyor..."):
                         try:
-                            # Sadece ilgili sayfaları çekerek kota aşımını engelliyoruz
                             kelimeler = [k.lower().strip() for k in olay_metni.split() if len(k) > 2]
                             sorgu = supabase.table("kural_icerikleri").select("sayfa_no, icerik").eq("kategori", st.session_state.aktif_kategori)
                             
@@ -207,8 +253,7 @@ def hakem_panelini_ciz():
                                     tum_metin += f"\n--- Sayfa {satir['sayfa_no']} ---\n{satir['icerik']}\n"
                             
                             prompt = f"""
-                            Sen uluslararası yetkili bir Tenis Başhakemisin (Gold Badge).
-                            
+                            Sen uluslararası yetkili bir Tenis Başhakemisin.
                             Sana resmi tenis kuralları dokümanından derlenen ilgili sayfaları veriyorum:
                             KURAL METİNLERİ:
                             {tum_metin}
@@ -216,10 +261,7 @@ def hakem_panelini_ciz():
                             HAKEMİN SORDUĞU OLAY:
                             "{olay_metni}"
                             
-                            GÖREVİN:
-                            Sadece yukarıda verdiğim kural metinlerine dayanarak bu olayın kural ihlali olup olmadığını, hakemin hangi kararı vermesi gerektiğini (ve varsa cezasını) net ve profesyonel bir dille açıkla.
-                            Cevabının sonuna, kararı dayandırdığın 'Sayfa Numarasını' mutlaka ekle.
-                            Eğer olay metinlerde geçmiyorsa "Bu duruma uygun spesifik kural bulunamadı" de.
+                            GÖREVİN: Olayın ihlal olup olmadığını, verilecek kararı ve cezasını açıkla. Kararı dayandırdığın Sayfa Numarasını ekle.
                             """
                             
                             cevap = ai_model.generate_content(prompt)
@@ -232,7 +274,8 @@ def hakem_panelini_ciz():
     with sekme_indeks:
         st.subheader("📚 Kayıtlı Belgeler Kütüphanesi")
         try:
-            response = supabase.table("kural_icerikleri").select("dosya_adi, kategori, dosya_url").execute()
+            # Buraya da 1000 limitini kaldırmak için .limit(10000) eklendi
+            response = supabase.table("kural_icerikleri").select("dosya_adi, kategori, dosya_url").limit(10000).execute()
             if response.data:
                 df = pd.DataFrame(response.data)
                 df_unique = df.drop_duplicates(subset=["dosya_adi"]).reset_index(drop=True)
@@ -250,10 +293,8 @@ def hakem_panelini_ciz():
                             st.caption(f"📂 {row['kategori']}")
                         with col3:
                             doc_url = row['dosya_url']
-                            if isinstance(doc_url, dict):
-                                doc_url = doc_url.get('publicUrl', '')
-                            if doc_url:
-                                st.markdown(f"🔗 [Aç / İndir]({doc_url})")
+                            if isinstance(doc_url, dict): doc_url = doc_url.get('publicUrl', '')
+                            if doc_url: st.markdown(f"🔗 [Aç / İndir]({doc_url})")
                         st.markdown("---")
                 else:
                     kategoriler_listesi = df_unique["kategori"].unique().tolist()
@@ -264,14 +305,11 @@ def hakem_panelini_ciz():
                         if not df_filtered.empty:
                             for idx, row in df_filtered.iterrows():
                                 col1, col2 = st.columns([4, 1])
-                                with col1:
-                                    st.markdown(f"**{row['dosya_adi']}**")
+                                with col1: st.markdown(f"**{row['dosya_adi']}**")
                                 with col2:
                                     doc_url = row['dosya_url']
-                                    if isinstance(doc_url, dict):
-                                        doc_url = doc_url.get('publicUrl', '')
-                                    if doc_url:
-                                        st.markdown(f"🔗 [Aç / İndir]({doc_url})")
+                                    if isinstance(doc_url, dict): doc_url = doc_url.get('publicUrl', '')
+                                    if doc_url: st.markdown(f"🔗 [Aç / İndir]({doc_url})")
                                 st.markdown("---")
                         else:
                             st.info("Bu kategoride kayıtlı belge bulunmuyor.")
