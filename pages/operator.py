@@ -54,10 +54,21 @@ else:
                     dosya_verisi = dosya.read()
                     
                     try:
+                        # KESİN ÇÖZÜM: Eski dosyayı metadata hatasını önlemek için veritabanından tamamen uçuruyoruz
+                        try:
+                            supabase.storage.from_("Belgeler").remove([dosya_adi])
+                        except:
+                            pass # Eğer dosya zaten yoksa hata vermemesi için sessizce geç
+                        
+                        # Tertemiz yeni dosyayı garantili PDF kimliğiyle yüklüyoruz
+                        file_options = {
+                            "content-type": "application/pdf"
+                        }
+                        
                         supabase.storage.from_("Belgeler").upload(
-                            dosya_adi, 
-                            dosya_verisi, 
-                            file_options={"upsert": "true", "content-type": "application/pdf"}
+                            path=dosya_adi, 
+                            file=dosya_verisi, 
+                            file_options=file_options
                         )
                         
                         res_url = supabase.storage.from_("Belgeler").get_public_url(dosya_adi)
