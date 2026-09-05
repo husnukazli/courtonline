@@ -115,44 +115,41 @@ def hakem_panelini_ciz():
                 with st.chat_message("assistant"):
                     with st.spinner("Varyasyonlar hesaplanıyor ve veritabanı taranıyor..."):
                         try:
-                            # Adım 1: Kullanıcı girdisini normalize et
+                            # Adım 1: Normalize Et
                             aranan_ilk = aranan_kelime.lower().strip()
-                            aranan_ilk = re.sub(r'\s+', ' ', aranan_ilk) # Fazla boşlukları temizle
-                            aranan_saf = aranan_ilk.replace(" ", "").replace("-", "") # Sıfır tolerans (boşluksuz/tiresiz form)
+                            aranan_ilk = re.sub(r'\s+', ' ', aranan_ilk)
+                            aranan_saf = aranan_ilk.replace(" ", "").replace("-", "")
 
                             temel_terimler = set([aranan_ilk])
 
-                            # Adım 2: Sözlükte Çift Yönlü ve Esnek Arama
+                            # Adım 2: Çift Yönlü Sözlük Araması
                             for tr_key, en_list in TENNIS_SOZLugu.items():
                                 tr_saf = tr_key.replace(" ", "").replace("-", "")
                                 en_saf_listesi = [kelime.replace(" ", "").replace("-", "") for kelime in en_list]
                                 
-                                # Eğer kullanıcının girdiği kelimenin "saf" hali, sözlükteki herhangi bir kelimenin "saf" haliyle eşleşiyorsa
                                 if (aranan_saf in tr_saf) or any(aranan_saf in en_saf for en_saf in en_saf_listesi):
                                     temel_terimler.add(tr_key)
                                     temel_terimler.update(en_list)
 
-                            # Adım 3: Tüm bulunan terimlerin varyasyonlarını (boşluklu, bitişik, tireli) üret
+                            # Adım 3: Esnek Varyasyonlar Üret
                             aranacak_terimler = set()
                             for terim in temel_terimler:
                                 terim = terim.strip()
                                 aranacak_terimler.add(terim)
                                 if ' ' in terim:
-                                    aranacak_terimler.add(terim.replace(' ', ''))       # örn: foot fault -> footfault
-                                    aranacak_terimler.add(terim.replace(' ', '-'))      # örn: foot fault -> foot-fault
+                                    aranacak_terimler.add(terim.replace(' ', ''))
+                                    aranacak_terimler.add(terim.replace(' ', '-'))
                                 if '-' in terim:
-                                    aranacak_terimler.add(terim.replace('-', ''))       # örn: tie-break -> tiebreak
-                                    aranacak_terimler.add(terim.replace('-', ' '))      # örn: tie-break -> tie break
+                                    aranacak_terimler.add(terim.replace('-', ''))
+                                    aranacak_terimler.add(terim.replace('-', ' '))
                                     
                             aranacak_terimler_listesi = list(aranacak_terimler)
                             
-                            # Adım 4: Veritabanında (ilike ile büyük/küçük harf duyarsız) sorgu oluştur
                             sorgu = supabase.table("kural_icerikleri").select("dosya_adi, kategori, sayfa_no, dosya_url, icerik")
                             
                             if st.session_state.aktif_kategori != "Tüm Talimatlar":
                                 sorgu = sorgu.eq("kategori", st.session_state.aktif_kategori)
                             
-                            # Tüm varyasyonları içeren OR (veya) sorgusu zinciri oluştur
                             filtre_parcalari = [f"icerik.ilike.%{terim}%" for terim in aranacak_terimler_listesi]
                             sorgu = sorgu.or_(",".join(filtre_parcalari))
                             
@@ -172,22 +169,21 @@ def hakem_panelini_ciz():
                                     metin = kayit['icerik']
                                     metin_lower = metin.lower()
                                     
-                                    # Metin içinde bizim ürettiğimiz varyasyonlardan HANGİSİNİN geçtiğini tespit et
-                                    bulunan_varyasyon = aranacak_terimler_listesi[0] # Varsayılan
+                                    bulunan_varyasyon = aranacak_terimler_listesi[0]
                                     for varyasyon in aranacak_terimler_listesi:
                                         if varyasyon in metin_lower:
                                             bulunan_varyasyon = varyasyon
                                             break
                                     
                                     if pdf_url:
-                                        # Hangi varyasyon (boşluklu/tireli vs.) bulunduysa tarayıcıya onu highlight ettiriyoruz
                                         url_kodlu_terim = urllib.parse.quote(f'"{bulunan_varyasyon}"')
-                                        hedefli_url = f"{pdf_url}#page={sayfa_no}&search={url_kodlu_terim}"
+                                        # KRİTİK GÜNCELLEME: ?render=true eklendi
+                                        hedefli_url = f"{pdf_url}?render=true#page={sayfa_no}&search={url_kodlu_terim}"
                                         
                                         st.markdown(
                                             f'''<a href="{hedefli_url}" target="_blank" 
                                             style="background-color: #2e3034; color: #39ff14; padding: 8px 12px; border-radius: 6px; text-decoration: none; display: inline-block; margin-bottom: 10px; font-weight: bold; border: 1px solid #39ff14;">
-                                            {sayfa_no}. Sayfayı Aç ve "{bulunan_varyasyon}" Kelimesini Vurgula
+                                            ↗️ {sayfa_no}. Sayfayı Aç ve "{bulunan_varyasyon}" Kelimesini Vurgula
                                             </a>''', 
                                             unsafe_allow_html=True
                                         )
@@ -198,7 +194,6 @@ def hakem_panelini_ciz():
                                         bitis = min(len(metin), idx + 350)
                                         kesit = metin[baslangic:bitis].replace("\n", " ")
                                         
-                                        # Kesin eşleşen varyasyonu yeşil neon renkle highlight et
                                         pattern = re.compile(re.escape(bulunan_varyasyon), re.IGNORECASE)
                                         vurgulu_kesit = pattern.sub(
                                             lambda m: f'<span style="background-color: #39ff14; color: #000000; font-weight: bold; padding: 2px 4px; border-radius: 3px;">{m.group(0)}</span>', 
