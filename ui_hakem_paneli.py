@@ -38,17 +38,17 @@ def supabase_baglantisi_kur():
     return create_client(url, key)
 
 def hakem_panelini_ciz():
-    st.title("🎾 Başhakem Dijital Asistanı")
+    st.title("Başhakem Dijital Asistanı")
     st.markdown("Talimatlarda arama yapın veya kütüphane indeksini inceleyin.")
     st.markdown("---")
 
     try:
         supabase = supabase_baglantisi_kur()
     except Exception as e:
-        st.error("⚠️ Supabase bağlantı ayarları (Secrets) yüklenemedi. Lütfen Streamlit Cloud Secrets bölümünü kontrol edin.")
+        st.error("Supabase bağlantı ayarları (Secrets) yüklenemedi. Lütfen Streamlit Cloud Secrets bölümünü kontrol edin.")
         return
 
-    sekme_arama, sekme_indeks = st.tabs(["🔍 Kural Arama", "📚 Belge İndeksi & Kütüphane"])
+    sekme_arama, sekme_indeks = st.tabs(["Kural Arama", "Belge İndeksi & Kütüphane"])
 
     with sekme_arama:
         if 'aktif_kategori' not in st.session_state:
@@ -56,48 +56,47 @@ def hakem_panelini_ciz():
 
         st.subheader("Kategori Seçin")
         
-        # Kategoriler 4 gruba mantıklı şekilde ayrıldı
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            if st.button("🏆 ITF Kuralları", use_container_width=True):
+            if st.button("ITF Kuralları", use_container_width=True):
                 st.session_state.aktif_kategori = "ITF Kuralları"
-            if st.button("👨 Men's WTT", use_container_width=True):
-                st.session_state.aktif_kategori = "Men's World Tennis Tour"
-            if st.button("👩 Women's WTT", use_container_width=True):
-                st.session_state.aktif_kategori = "Women's World Tennis Tour"
-            if st.button("🌟 WTT Juniors", use_container_width=True):
-                st.session_state.aktif_kategori = "World Tennis Tour Juniors"
+            if st.button("Men's WTT", use_container_width=True):
+                st.session_state.aktif_kategori = "Men's WTT"
+            if st.button("Women's WTT", use_container_width=True):
+                st.session_state.aktif_kategori = "Women's WTT"
+            if st.button("WTT Juniors", use_container_width=True):
+                st.session_state.aktif_kategori = "WTT Juniors"
                 
         with col2:
-            if st.button("🏅 WTT Masters", use_container_width=True):
-                st.session_state.aktif_kategori = "World Tennis Masters Tour"
-            if st.button("♿ Wheelchair Tour", use_container_width=True):
-                st.session_state.aktif_kategori = "Wheelchair Tennis Tour"
-            if st.button("🏖️ Beach Tennis", use_container_width=True):
-                st.session_state.aktif_kategori = "Beach Tennis World Tour"
-            if st.button("🇪🇺 Tennis Europe", use_container_width=True):
+            if st.button("WTT Masters", use_container_width=True):
+                st.session_state.aktif_kategori = "WTT Masters"
+            if st.button("Wheelchair Tour", use_container_width=True):
+                st.session_state.aktif_kategori = "Wheelchair Tour"
+            if st.button("Beach Tennis", use_container_width=True):
+                st.session_state.aktif_kategori = "Beach Tennis"
+            if st.button("Tennis Europe", use_container_width=True):
                 st.session_state.aktif_kategori = "Tennis Europe"
                 
         with col3:
-            if st.button("🌍 ATP", use_container_width=True):
+            if st.button("ATP", use_container_width=True):
                 st.session_state.aktif_kategori = "ATP"
-            if st.button("👑 WTA", use_container_width=True):
+            if st.button("WTA", use_container_width=True):
                 st.session_state.aktif_kategori = "WTA"
-            if st.button("🏟️ Grand Slam", use_container_width=True):
+            if st.button("Grand Slam", use_container_width=True):
                 st.session_state.aktif_kategori = "Grand Slam"
                 
         with col4:
-            if st.button("🇹🇷 TTF Ulusal", use_container_width=True):
+            if st.button("TTF Ulusal", use_container_width=True):
                 st.session_state.aktif_kategori = "TTF Ulusal"
-            if st.button("🏫 Ulusal Diğer", use_container_width=True):
+            if st.button("Ulusal Diğer", use_container_width=True):
                 st.session_state.aktif_kategori = "Ulusal Diğer"
-            if st.button("📌 Sık Sorulanlar", use_container_width=True):
+            if st.button("Sık Sorulanlar", use_container_width=True):
                 st.session_state.aktif_kategori = "Sık Sorulanlar"
 
         st.markdown("---")
         
-        if st.button("🌐 Tüm Talimatlarda Aynı Anda Ara (Pro)", type="primary", use_container_width=True):
+        if st.button("Tüm Talimatlarda Aynı Anda Ara (Pro)", type="primary", use_container_width=True):
             st.session_state.aktif_kategori = "Tüm Talimatlar"
 
         st.markdown("---")
@@ -105,7 +104,7 @@ def hakem_panelini_ciz():
         if st.session_state.aktif_kategori == "Kategori Seçilmedi":
             st.warning("Lütfen yukarıdan arama yapmak istediğiniz talimatı seçin.")
         else:
-            st.success(f"📍 **Aktif Kategori / Arama Alanı:** {st.session_state.aktif_kategori}")
+            st.success(f"**Aktif Kategori / Arama Alanı:** {st.session_state.aktif_kategori}")
 
             aranan_kelime = st.chat_input("Örn: mola, top değişimi, coaching, default...")
             
@@ -137,7 +136,7 @@ def hakem_panelini_ciz():
                                 
                                 for kayit in sonuclar:
                                     sayfa_no = kayit.get('sayfa_no', 1)
-                                    st.markdown(f"📄 **Belge:** {kayit['dosya_adi']} *({kayit['kategori']}) | 📌 Sayfa: {sayfa_no}*")
+                                    st.markdown(f"**Belge:** {kayit['dosya_adi']} *({kayit['kategori']}) | Sayfa: {sayfa_no}*")
                                     
                                     pdf_url = kayit['dosya_url']
                                     if isinstance(pdf_url, dict):
@@ -147,15 +146,13 @@ def hakem_panelini_ciz():
                                     bul_terim = aranan_lower if aranan_lower in metin.lower() else aranacak_terimler[0]
                                     
                                     if pdf_url:
-                                        # URL sonuna sayfa atlama ve arama (TIRNAK İÇİNDE) parametreleri ekleme
                                         url_kodlu_terim = urllib.parse.quote(f'"{bul_terim}"')
                                         hedefli_url = f"{pdf_url}#page={sayfa_no}&search={url_kodlu_terim}"
                                         
-                                        # Streamlit engelini aşan saf HTML butonu
                                         st.markdown(
                                             f'''<a href="{hedefli_url}" target="_blank" 
                                             style="background-color: #2e3034; color: #39ff14; padding: 8px 12px; border-radius: 6px; text-decoration: none; display: inline-block; margin-bottom: 10px; font-weight: bold; border: 1px solid #39ff14;">
-                                            ↗️ {sayfa_no}. Sayfayı Doğrudan Aç ve "{bul_terim}" Kelimesine Git
+                                            {sayfa_no}. Sayfayı Doğrudan Aç ve "{bul_terim}" Kelimesine Git
                                             </a>''', 
                                             unsafe_allow_html=True
                                         )
@@ -173,23 +170,23 @@ def hakem_panelini_ciz():
                                             kesit
                                         )
                                         
-                                        st.markdown(f"💡 **İlgili Bağlam:**<br>...{vurgulu_kesit}...", unsafe_allow_html=True)
+                                        st.markdown(f"**İlgili Bağlam:**<br>...{vurgulu_kesit}...", unsafe_allow_html=True)
                                     else:
-                                        st.markdown(f"💡 **İlgili Bağlam:**<br>...{metin[:300]}...", unsafe_allow_html=True)
+                                        st.markdown(f"**İlgili Bağlam:**<br>...{metin[:300]}...", unsafe_allow_html=True)
                                         
                                     st.markdown("---")
                             else:
-                                st.warning(f"'{aranan_kelime}' (veya genişletilmiş sözlük karşılıkları) seçilen kategoride bulunamadı.")
+                                st.warning(f"'{aranan_kelime}' (veya sözlük karşılıkları) seçilen kategoride bulunamadı.")
                         except Exception as e:
                             st.error(f"Arama sırasında hata oluştu: {e}")
 
     with sekme_indeks:
-        st.subheader("📚 Kayıtlı Belgeler Kütüphanesi")
+        st.subheader("Kayıtlı Belgeler Kütüphanesi")
         st.markdown("Sistemdeki tüm kural kitapçıklarını filtreleyebilir, inceleyebilir veya indirebilirsiniz.")
         
         siralama_turu = st.radio(
             "Sıralama ve Filtreleme Modu:", 
-            ["🔤 Alfabetik Sıralama (Tümü)", "📂 Kategoriye Göre Sıralama"],
+            ["Alfabetik Sıralama (Tümü)", "Kategoriye Göre Sıralama"],
             horizontal=True
         )
         
@@ -199,7 +196,7 @@ def hakem_panelini_ciz():
                 df = pd.DataFrame(response.data)
                 df_unique = df.drop_duplicates(subset=["dosya_adi"]).reset_index(drop=True)
                 
-                if siralama_turu == "🔤 Alfabetik Sıralama (Tümü)":
+                if siralama_turu == "Alfabetik Sıralama (Tümü)":
                     df_unique = df_unique.sort_values(by="dosya_adi", ascending=True)
                     st.markdown("---")
                     for idx, row in df_unique.iterrows():
@@ -207,13 +204,13 @@ def hakem_panelini_ciz():
                         with col1:
                             st.markdown(f"**{row['dosya_adi']}**")
                         with col2:
-                            st.caption(f"📂 {row['kategori']}")
+                            st.caption(f"Kategori: {row['kategori']}")
                         with col3:
                             doc_url = row['dosya_url']
                             if isinstance(doc_url, dict):
                                 doc_url = doc_url.get('publicUrl', '')
                             if doc_url:
-                                st.markdown(f"🔗 [Aç / İndir]({doc_url})")
+                                st.markdown(f"[Aç / İndir]({doc_url})")
                         st.markdown("---")
                         
                 else:
@@ -236,7 +233,7 @@ def hakem_panelini_ciz():
                                     if isinstance(doc_url, dict):
                                         doc_url = doc_url.get('publicUrl', '')
                                     if doc_url:
-                                        st.markdown(f"🔗 [Aç / İndir]({doc_url})")
+                                        st.markdown(f"[Aç / İndir]({doc_url})")
                                 st.markdown("---")
                         else:
                             st.info("Bu kategoride kayıtlı belge bulunmuyor.")
